@@ -1,0 +1,14 @@
+Website:
+  HostingIP: 127.0.0.1
+  Port: 8000
+  PageAutoRefresh: 15
+  DebugMode: True
+  AccessKey: 
+
+Files:
+  MonitoringLogFile: PowerControllerUI.log
+  MonitoringLogFileMaxLines: 200
+  # How much information do we write to the log file. One of: none; error; warning; summary; detailed; debug; all
+  LogFileVerbosity: detailed
+  # How much information do we write to the console. One of: error; warning; summary; detailed; debug; all
+  ConsoleVerbosity: detailed

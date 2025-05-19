@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% if page_data['RefreshDelay'] > 0 %}
+        <meta http-equiv="refresh" content="page_data['RefreshDelay']">
+    {% endif %}
+    <title>{{page_data['DeviceName']}} detail page for [date]</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <div>
+        <h1>Detail page for {{page_data['DeviceName']}} for {{page_data['DateLong']}}</h1>
+
+        <!-- Navigation Buttons -->
+        <div>
+            <a href="{{ url_for('views.day_detail', day=page_data['PreviousDay'], key=page_data['AccessKey']) }}" 
+               class="button{% if page_data['PreviousDay'] is none %} disabled{% endif %}">
+                Previous Day
+            </a>
+            <a href="{{ url_for('views.day_detail', day=page_data['NextDay'], key=page_data['AccessKey']) }}" 
+               class="button{% if page_data['NextDay'] is none %} disabled{% endif %}"">
+                Next Day
+            </a>
+            <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
+                class="button">
+                Back to Summary
+            </a>
+    
+
+
+        </div>
+
+        <!-- Daily Data Table -->
+        <table>
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Date</td><td>{{ page_data['Date'] }}</td>
+                </tr>
+                <tr>
+                    <td>Shortfall Carried Over</td><td>{{ page_data['Shortfall'] }} hours</td>
+                </tr>
+                <tr>
+                    <td>Target Runtime</td><td>{{ page_data['TargetRuntime'] }} hours</td>
+                </tr>
+                <tr>
+                    <td>Actual Runtime</td><td>{{ page_data['ActualRuntime'] }}</td>
+                </tr>
+                <tr>
+                    <td>Energy Usage</td><td>{{ page_data['EnergyUsed'] }}</td>                    
+                </tr>
+                {% if page_data['HaveRunPlan'] %}
+                <tr>
+                    <td>{{page_data['DeviceName']}} Runs</td>
+                    <td>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Start</th>
+                                    <th>Stop</th>
+                                    <th>Price</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                    {% for run in page_data['DeviceRuns'] %}
+                                    <tr>
+                                        <td>{{ run['Start'] }}</td>
+                                        <td>{{ run['End'] }}</td>
+                                        <td>{{ run['Price'] }} </td>
+                                    </tr>
+                                    {% endfor %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}            
+            </tbody>
+        </table>
+        
+    </div>
+    <script 
+        type="text/javascript" 
+        src="{{ url_for('static', filename='index.js') }}"
+    ></script>
+</body>
+</html>

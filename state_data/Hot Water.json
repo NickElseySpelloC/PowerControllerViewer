@@ -1,0 +1,391 @@
+{
+    "MaxDailyRuntimeAllowed": 10,
+    "LastStateSaveTime": "2025-04-26 11:31:03",
+    "TotalRuntimePriorDays": 61.1393,
+    "AverageRuntimePriorDays": 8.734185714285713,
+    "CurrentShortfall": 0,
+    "ForecastRuntimeToday": 1.5,
+    "IsDeviceRunning": false,
+    "DeviceLastStartTime": null,
+    "DeviceType": "HotWaterSystem",
+    "DeviceName": "Hot Water",
+    "LastStatusMessage": "Hot Water won't run because current time slot not one of the cheapest forecast slots for the rest of today",
+    "CurrentPrice": 15.77658,
+    "PriceTime": "2025-04-26 11:31:00",
+    "EnergyAtLastStart": 38043.7,
+    "EnergyUsed": 30104.200000000004,
+    "TotalCost": 442.53837400000003,
+    "AveragePrice": 14.700220367922082,
+    "EarlierTotals": {
+        "EnergyUsed": 58630.081,
+        "TotalCost": 935.4006589799999,
+        "RunTime": 140.0555
+    },
+    "AlltimeTotals": {
+        "EnergyUsed": 88734.281,
+        "TotalCost": 1377.9390329799999,
+        "AveragePrice": 15.528824006361193,
+        "RunTime": 203.6957
+    },
+    "TodayRunPlan": [
+        {
+            "ID": 0,
+            "From": "13:00",
+            "To": "14:00",
+            "AveragePrice": 13.94
+        }
+    ],
+    "TodayOriginalRunPlan": [
+        {
+            "ID": 0,
+            "From": "10:30",
+            "To": "13:30",
+            "AveragePrice": 13.57
+        }
+    ],
+    "AverageForecastPrice": 9.29415,
+    "DailyData": [
+        {
+            "ID": 0,
+            "Date": "2025-04-26",
+            "RequiredDailyRuntime": 24,
+            "PriorShortfall": 0,
+            "TargetRuntime": 24,
+            "RuntimeToday": 2.5008999999999997,
+            "RemainingRuntimeToday": 12.466666666666667,
+            "EnergyUsed": 5214.700000000004,
+            "AveragePrice": 19.033446794638227,
+            "TotalCost": 99.25371500000004,
+            "DeviceRuns": [
+                {
+                    "ID": 0,
+                    "StartTime": "2025-04-26 00:01:03",
+                    "EndTime": "2025-04-26 02:01:04",
+                    "RunTime": 2.0008,
+                    "EnergyUsedStart": 34081.6,
+                    "EnergyUsedForRun": 3962.0999999999985,
+                    "Price": 20.71,
+                    "Cost": 82.04515099999996
+                },
+                {
+                    "ID": 1,
+                    "StartTime": "2025-04-26 10:16:04",
+                    "EndTime": "2025-04-26 10:46:03",
+                    "RunTime": 0.5001,
+                    "EnergyUsedStart": 38043.7,
+                    "EnergyUsedForRun": 1252.6000000000058,
+                    "Price": 13.74,
+                    "Cost": 17.20856400000008
+                }
+            ]
+        },
+        {
+            "ID": 1,
+            "Date": "2025-04-25",
+            "RequiredDailyRuntime": 24,
+            "PriorShortfall": 0,
+            "TargetRuntime": 24,
+            "RuntimeToday": 6.753699999999999,
+            "RemainingRuntimeToday": 0.21666666666666667,
+            "EnergyUsed": 5508.0999999999985,
+            "AveragePrice": 15.96489152339282,
+            "TotalCost": 87.93621899999998,
+            "DeviceRuns": [
+                {
+                    "ID": 0,
+                    "StartTime": "2025-04-25 00:01:04",
+                    "EndTime": "2025-04-25 02:01:03",
+                    "RunTime": 2.0004999999999997,
+                    "EnergyUsedStart": 28573.5,
+                    "EnergyUsedForRun": 3243.7999999999993,
+                    "Price": 20.23,
+                    "Cost": 65.62845999999999
+                },
+                {
+                    "ID": 1,
+                    "StartTime": "2025-04-25 10:16:04",
+                    "EndTime": "2025-04-25 12:31:08",
+                    "RunTime": 2.252,
+                    "EnergyUsedStart": 31817.3,
+                    "EnergyUsedForRun": 2264.2999999999993,
+                    "Price": 9.85,
+                    "Cost": 22.30775899999999
+                },
+                {
+                    "ID": 2,
+                    "StartTime": "2025-04-25 13:01:03",
+                    "EndTime": "2025-04-25 15:31:03",
+                    "RunTime": 2.5012,
+                    "EnergyUsedStart": 34081.6,
+                    "EnergyUsedForRun": 0.0,
+                    "Price": null,
+                    "Cost": 0.0
+                }
+            ]
+        },
+        {
+            "ID": 2,
+            "Date": "2025-04-24",
+            "RequiredDailyRuntime": 24,
+            "PriorShortfall": 0,
+            "TargetRuntime": 24,
+            "RuntimeToday": 7.1164000000000005,
+            "RemainingRuntimeToday": 0.21666666666666667,
+            "EnergyUsed": 6633.9000000000015,
+            "AveragePrice": 15.676201932498227,
+            "TotalCost": 103.99435600000001,
+            "DeviceRuns": [
+                {
+                    "ID": 0,
+                    "StartTime": "2025-04-24 00:01:04",
+                    "EndTime": "2025-04-24 02:01:03",
+                    "RunTime": 2.0003,
+                    "EnergyUsedStart": 21939.6,
+                    "EnergyUsedForRun": 4559.200000000001,
+                    "Price": 18.1,
+                    "Cost": 82.53711200000001
+                },
+                {
+                    "ID": 1,
+                    "StartTime": "2025-04-24 10:09:10",
+                    "EndTime": "2025-04-24 15:01:03",
+                    "RunTime": 4.8662,
+                    "EnergyUsedStart": 26498.8,
+                    "EnergyUsedForRun": 1285.2000000000007,
+                    "Price": 8.12,
+                    "Cost": 10.435824000000004
+                },
+                {
+                    "ID": 2,
+                    "StartTime": "2025-04-24 16:01:04",
+                    "EndTime": "2025-04-24 16:16:03",
+                    "RunTime": 0.2499,
+                    "EnergyUsedStart": 27784.0,
+                    "EnergyUsedForRun": 789.5,
+                    "Price": 13.96,
+                    "Cost": 11.02142
+                }
+            ]
+        },
+        {
+            "ID": 3,
+            "Date": "2025-04-23",
+            "RequiredDailyRuntime": 24,
+            "PriorShortfall": 0,
+            "TargetRuntime": 24,
+            "RuntimeToday": 9.5027,
+            "RemainingRuntimeToday": 0.21666666666666667,
+            "EnergyUsed": 5270.0,
+            "AveragePrice": 13.041923529411768,
+            "TotalCost": 68.73093700000001,
+            "DeviceRuns": [
+                {
+                    "ID": 0,
+                    "StartTime": "2025-04-23 00:01:03",
+                    "EndTime": "2025-04-23 04:01:03",
+                    "RunTime": 4.0018,
+                    "EnergyUsedStart": 16669.6,
+                    "EnergyUsedForRun": 4514.600000000002,
+                    "Price": 14.3,
+                    "Cost": 64.54809400000002
+                },
+                {
+                    "ID": 1,
+                    "StartTime": "2025-04-23 10:16:04",
+                    "EndTime": "2025-04-23 15:46:03",
+                    "RunTime": 5.5009,
+                    "EnergyUsedStart": 21184.2,
+                    "EnergyUsedForRun": 755.3999999999978,
+                    "Price": 5.54,
+                    "Cost": 4.182842999999989
+                }
+            ]
+        },
+        {
+            "ID": 4,
+            "Date": "2025-04-22",
+            "RequiredDailyRuntime": 24,
+            "PriorShortfall": 0,
+            "TargetRuntime": 24,
+            "RuntimeToday": 7.752999999999998,
+            "RemainingRuntimeToday": 0.21666666666666667,
+            "EnergyUsed": 1614.699999999999,
+            "AveragePrice": 14.950169690964273,
+            "TotalCost": 24.140038999999994,
+            "DeviceRuns": [
+                {
+                    "ID": 0,
+                    "StartTime": "2025-04-22 00:01:03",
+                    "EndTime": "2025-04-22 02:01:03",
+                    "RunTime": 2.0008,
+                    "EnergyUsedStart": 14194.4,
+                    "EnergyUsedForRun": 824.8000000000011,
+                    "Price": 17.39,
+                    "Cost": 14.34440900000002
+                },
+                {
+                    "ID": 1,
+                    "StartTime": "2025-04-22 10:16:03",
+                    "EndTime": "2025-04-22 14:16:03",
+                    "RunTime": 4.001899999999999,
+                    "EnergyUsedStart": 15879.7,
+                    "EnergyUsedForRun": 30.0,
+                    "Price": 4.83,
+                    "Cost": 0.1449
+                },
+                {
+                    "ID": 2,
+                    "StartTime": "2025-04-22 14:31:04",
+                    "EndTime": "2025-04-22 15:46:03",
+                    "RunTime": 1.2502,
+                    "EnergyUsedStart": 15909.7,
+                    "EnergyUsedForRun": 759.8999999999978,
+                    "Price": 12.7,
+                    "Cost": 9.650729999999973
+                },
+                {
+                    "ID": 3,
+                    "StartTime": "2025-04-22 16:01:03",
+                    "EndTime": "2025-04-22 16:31:03",
+                    "RunTime": 0.5001,
+                    "EnergyUsedStart": 16669.6,
+                    "EnergyUsedForRun": 0.0,
+                    "Price": null,
+                    "Cost": 0.0
+                }
+            ]
+        },
+        {
+            "ID": 5,
+            "Date": "2025-04-21",
+            "RequiredDailyRuntime": 24,
+            "PriorShortfall": 0,
+            "TargetRuntime": 24,
+            "RuntimeToday": 13.2635,
+            "RemainingRuntimeToday": 0.21666666666666667,
+            "EnergyUsed": 3441.6000000000004,
+            "AveragePrice": 9.984092863784287,
+            "TotalCost": 34.361254,
+            "DeviceRuns": [
+                {
+                    "ID": 0,
+                    "StartTime": "2025-04-21 00:01:03",
+                    "EndTime": "2025-04-21 07:01:18",
+                    "RunTime": 7.007600000000001,
+                    "EnergyUsedStart": 8327.7,
+                    "EnergyUsedForRun": 941.2999999999993,
+                    "Price": 16.4,
+                    "Cost": 15.440986999999987
+                },
+                {
+                    "ID": 1,
+                    "StartTime": "2025-04-21 10:16:03",
+                    "EndTime": "2025-04-21 13:46:03",
+                    "RunTime": 3.5009000000000006,
+                    "EnergyUsedStart": 10122.8,
+                    "EnergyUsedForRun": 192.0,
+                    "Price": 4.88,
+                    "Cost": 0.93696
+                },
+                {
+                    "ID": 2,
+                    "StartTime": "2025-04-21 14:01:04",
+                    "EndTime": "2025-04-21 14:46:03",
+                    "RunTime": 0.75,
+                    "EnergyUsedStart": 10314.8,
+                    "EnergyUsedForRun": 0.0,
+                    "Price": null,
+                    "Cost": 0.0
+                },
+                {
+                    "ID": 3,
+                    "StartTime": "2025-04-21 15:01:04",
+                    "EndTime": "2025-04-21 17:01:18",
+                    "RunTime": 2.005,
+                    "EnergyUsedStart": 10314.8,
+                    "EnergyUsedForRun": 2308.300000000001,
+                    "Price": 7.79,
+                    "Cost": 17.98330700000001
+                }
+            ]
+        },
+        {
+            "ID": 6,
+            "Date": "2025-04-20",
+            "RequiredDailyRuntime": 24,
+            "PriorShortfall": 0,
+            "TargetRuntime": 24,
+            "RuntimeToday": 6.502400000000001,
+            "RemainingRuntimeToday": 0.21666666666666667,
+            "EnergyUsed": 2421.2000000000007,
+            "AveragePrice": 9.96276804890137,
+            "TotalCost": 24.121854000000006,
+            "DeviceRuns": [
+                {
+                    "ID": 0,
+                    "StartTime": "2025-04-20 12:15:14",
+                    "EndTime": "2025-04-20 17:01:19",
+                    "RunTime": 4.769900000000001,
+                    "EnergyUsedStart": 5906.5,
+                    "EnergyUsedForRun": 840.1000000000004,
+                    "Price": null,
+                    "Cost": 0.0
+                },
+                {
+                    "ID": 1,
+                    "StartTime": "2025-04-20 22:16:03",
+                    "EndTime": "2025-04-20 23:59:59",
+                    "RunTime": 1.7325,
+                    "EnergyUsedStart": 6746.6,
+                    "EnergyUsedForRun": 1581.1000000000004,
+                    "Price": 15.26,
+                    "Cost": 24.121854000000006
+                }
+            ]
+        },
+        {
+            "ID": 7,
+            "Date": "2025-04-19",
+            "RequiredDailyRuntime": 24,
+            "PriorShortfall": 0,
+            "TargetRuntime": 24,
+            "RuntimeToday": 10.2476,
+            "RemainingRuntimeToday": 0.21666666666666667,
+            "EnergyUsed": 0.0,
+            "AveragePrice": null,
+            "TotalCost": 0,
+            "DeviceRuns": [
+                {
+                    "ID": 0,
+                    "StartTime": "2025-04-19 00:01:05",
+                    "EndTime": "2025-04-19 02:16:04",
+                    "RunTime": 2.2485,
+                    "EnergyUsedStart": 65.1,
+                    "EnergyUsedForRun": 0.0,
+                    "Price": null,
+                    "Cost": 0.0
+                },
+                {
+                    "ID": 1,
+                    "StartTime": "2025-04-19 02:31:06",
+                    "EndTime": "2025-04-19 03:01:03",
+                    "RunTime": 0.4994,
+                    "EnergyUsedStart": 65.1,
+                    "EnergyUsedForRun": 0.0,
+                    "Price": null,
+                    "Cost": 0.0
+                },
+                {
+                    "ID": 2,
+                    "StartTime": "2025-04-19 07:01:05",
+                    "EndTime": "2025-04-19 14:31:04",
+                    "RunTime": 7.4997,
+                    "EnergyUsedStart": 65.1,
+                    "EnergyUsedForRun": 0.0,
+                    "Price": null,
+                    "Cost": 0.0
+                }
+            ]
+        }
+    ]
+}

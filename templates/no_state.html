@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="2">
+    <title>No state data available</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <div>
+        <h1>No State Data Available</h1>
+        <p>There are no PowerController state files available to view.</p>
+        <p>You must first configure the WebsiteBaseURL parameter in the PowerController's configuration file and successfully run the PowerController at least once.</p>
+    </div>
+
+
+    <script 
+        type="text/javascript" 
+        src="{{ url_for('static', filename='index.js') }}"
+    ></script>
+</body>
+</html>

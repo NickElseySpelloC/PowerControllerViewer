@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% if page_data['RefreshDelay'] > 0 %}
+        <meta http-equiv="refresh" content="{{page_data['RefreshDelay']}}">
+    {% endif %}
+    <title>Status summary for {{page_data['LastStatusMessage']}}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <div>
+        <h1>Status summary for the {{page_data['DeviceName']}}</h1>
+        <p>Status as at {{ page_data['TimeNow'] }}: {{ page_data['StatusMessage'] }}</p>
+
+        <!-- Navigation Buttons -->
+        <div>
+            {% if page_data['NextIndex'] is not none %}
+                <a href="{{ url_for('views.home', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
+                class="button">
+                Go to {{ page_data['NextDeviceName'] }} >>>
+                </a>
+            {% endif %}
+            <a href="{{ url_for('views.day_detail', day=0, key=page_data['AccessKey']) }}" 
+               class="button">
+               View {{page_data['DeviceName']}} Daily Data
+            </a>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Device</td><td>{{ page_data['DeviceName'] }}</td>
+                </tr>
+                <tr>
+                    <td>Last Check</td><td>{{ page_data['LastCheck'] }}</td>
+                </tr>
+                <tr>
+                    <td>Pump Status</td><td>{{ page_data['PumpStatus'] }}</td>
+                </tr>
+                <tr>
+                    <td>Remaning Runtime Today</td><td>{{ page_data['RemaningRuntime'] }} hours</td>
+                </tr>
+                <tr>
+                    <td>Average Daily Runtime</td><td>{{ page_data['AverageDailyRuntime'] }} hours</td>
+                </tr>
+                <tr>
+                    <td>Current Price</td><td>{{ page_data['CurrentPrice'] }} c/kWh</td>
+                </tr>
+                <tr>
+                    <td>Average Energy Price</td><td>{{ page_data['AverageEnergyPrice'] }} c/kWh</td>
+                </tr>
+                <tr>
+                    <td>Average Daily Usage</td><td>{{ page_data['AverageDailyUsage'] }} kWh</td>
+                </tr>
+                <tr>
+                    <td>Average Daily Cost</td><td>{{ page_data['AverageDailyCost'] }}</td>
+                </tr>
+                {% if page_data['HaveRunPlan'] %}
+                <tr>
+                    <td>Remaining Run Plan</td>
+                    <td>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th>Price</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                    {% for plan in page_data['RunPlan'] %}
+                                    <tr>
+                                        <td>{{ plan['From'] }}</td>
+                                        <td>{{ plan['To'] }}</td>
+                                        <td>{{ plan['AveragePrice'] }} c/kWh</td>
+                                    </tr>
+                                    {% endfor %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td>Forecast Average Price</td><td>{{ page_data['ForecastPrice'] }} c/kWh</td>
+                </tr>
+                {% if page_data['DebugMessage'] is not none %}
+                    <tr>
+                        <td>Debug Information</td><td>{{ page_data['DebugMessage'] | safe }} </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        
+    </div>
+    <script 
+        type="text/javascript" 
+        src="{{ url_for('static', filename='index.js') }}"
+    ></script>
+</body>
+</html>
