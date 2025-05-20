@@ -1,22 +1,21 @@
-'''
-General utility functions for the project.
-'''
+"""General utility functions for the project."""
 
+import inspect
 import json
 import os
 import sys
-from html import escape
-from datetime import datetime
 import traceback
-import inspect
+from datetime import datetime
+from html import escape
+from pathlib import Path
+
 import yaml
 from cerberus import Validator
 
 CONFIG_FILE = "PowerControllerUIConfig.yaml"
 
 def merge_configs(default, custom):
-    """ Merges two dictionaries recursively, with the custom dictionary """
-
+    """Merges two dictionaries recursively, with the custom dictionary."""
     for key, value in custom.items():
         if isinstance(value, dict) and key in default:
             merge_configs(default[key], value)
@@ -25,9 +24,8 @@ def merge_configs(default, custom):
     return default
 
 class ConfigManager:
-    """
-    Class to manage system configuration and file paths.
-    """
+    """Class to manage system configuration and file paths."""
+
     def __init__(self):
         self.config_file_path = self.select_file_location(CONFIG_FILE)
         self.config_last_modified = None
@@ -37,14 +35,14 @@ class ConfigManager:
                 "Port": "8000",
                 "PageAutoRefresh": 10,
                 "DebugMode": False,
-                "AccessKey": None
+                "AccessKey": None,
             },
             "Files": {
                 "MonitoringLogFile": "PowerControllerUI.log",
                 "MonitoringLogFileMaxLines": 5000,
                 "LogFileVerbosity": "summary",
-                "ConsoleVerbosity": "summary"
-            }
+                "ConsoleVerbosity": "summary",
+            },
         }
 
         self.default_config_schema = {
@@ -55,8 +53,8 @@ class ConfigManager:
                     "Port": {"type": "number", "required": False, "nullable": True, "min": 80, "max": 65535},
                     "PageAutoRefresh": {"type": "number", "required": False, "nullable": True, "min": 0, "max": 3600},
                     "DebugMode": {"type": "boolean", "required": False, "nullable": True},
-                    "AccessKey": {"type": "string", "required": False, "nullable": True}
-                }
+                    "AccessKey": {"type": "string", "required": False, "nullable": True},
+                },
             },
             "Files": {
                 "type": "dict",
@@ -66,28 +64,26 @@ class ConfigManager:
                     "LogFileVerbosity": {
                         "type": "string",
                         "required": True,
-                        "allowed": ["none", "error", "warning", "summary", "detailed", "debug", "all"]
+                        "allowed": ["none", "error", "warning", "summary", "detailed", "debug", "all"],
                     },
                     "ConsoleVerbosity": {
                         "type": "string",
                         "required": True,
-                        "allowed": ["error", "warning", "summary", "detailed", "debug", "all"]
-                    }
-                 }
-            }
+                        "allowed": ["error", "warning", "summary", "detailed", "debug", "all"],
+                    },
+                 },
+            },
         }
 
         self.load_config()
 
     def load_config(self):
-        """
-        Load the configuration file. If it does not exist, create it with default values."""
-
-        if not os.path.exists(self.config_file_path):
-            with open(self.config_file_path, "w", encoding="utf-8") as file:
+        """Load the configuration file. If it does not exist, create it with default values."""
+        if not Path(self.config_file_path).exists():
+            with Path(self.config_file_path).open("w", encoding="utf-8") as file:
                 yaml.dump(self.default_config, file)
 
-        with open(self.config_file_path, "r", encoding="utf-8") as file:
+        with Path(self.config_file_path).open(encoding="utf-8") as file:
             v = Validator()
             config_doc = yaml.safe_load(file)
 
@@ -98,15 +94,16 @@ class ConfigManager:
                 sys.exit(1)
 
         self.active_config = merge_configs(self.default_config, config_doc)
-        self.config_last_modified = os.path.getmtime(self.config_file_path)
+        self.config_last_modified = Path(self.config_file_path).stat().st_mtime
 
     def check_for_config_changes(self):
         """
         Check if the configuration file has changed. If it has, reload the configuration.
+
         :return: True if the configuration has changed, False otherwise.
         """
         # get the last modified time of the config file
-        last_modified = os.path.getmtime(self.config_file_path)
+        last_modified = Path(self.config_file_path).stat().st_mtime
 
         if self.config_last_modified is None or last_modified > self.config_last_modified:
             # The config file has changed, reload it
@@ -115,11 +112,11 @@ class ConfigManager:
             return True
 
         return False
-    
+
     def validate_no_placeholders(self, config_section, path=""):
         # Define expected placeholders
         placeholders = {
-            '<Your website API key here>'
+            "<Your website API key here>",
         }
 
         if isinstance(config_section, dict):
@@ -128,37 +125,35 @@ class ConfigManager:
         elif isinstance(config_section, list):
             for idx, item in enumerate(config_section):
                 self.validate_no_placeholders(item, f"{path}[{idx}]")
-        else:
-            if str(config_section).strip() in placeholders:
-                print(f"ERROR: Config value at '{path}' is still set to placeholder: '{config_section}'", file=sys.stderr)
-                print(f"Please update {CONFIG_FILE} with your actual credentials.", file=sys.stderr)
-                sys.exit(1)    
+        elif str(config_section).strip() in placeholders:
+            print(f"ERROR: Config value at '{path}' is still set to placeholder: '{config_section}'", file=sys.stderr)
+            print(f"Please update {CONFIG_FILE} with your actual credentials.", file=sys.stderr)
+            sys.exit(1)
 
-    def select_file_location(self, file_name: str, sub_dir: str = None) -> str:
+    def select_file_location(self, file_name: str, sub_dir: str | None = None) -> str:
         """
         Selects the file location for the given file name.
+
         :param file_name: The name of the file to locate.
         :param sub_dir: The sub directory to look in, if any.
         :return: The full path to the file. If the file does not exist in the current directory, it will look in the script directory.
         """
-
-        current_dir = os.getcwd()
-        script_dir = os.path.dirname(os.path.abspath(__file__))
+        current_dir = Path.cwd()
+        script_dir = Path(__file__).parent
         if sub_dir is None:
-            file_path = os.path.join(current_dir, file_name)
+            file_path = Path(current_dir) / file_name
         else:
-            file_path = os.path.join(current_dir, sub_dir, file_name)
-        if not os.path.exists(file_path):
+            file_path = Path(current_dir) / sub_dir / file_name
+        if not file_path.exists():
             if sub_dir is None:
-                file_path = os.path.join(script_dir, file_name)
+                file_path = Path(script_dir) / file_name
             else:
-                file_path = os.path.join(script_dir, sub_dir, file_name)
-        return file_path
+                file_path = Path(script_dir) / sub_dir / file_name
+        return str(file_path)
 
 class UtilityFunctions:
-    """
-    Class representing the state of the power controller.
-    """
+    """Class representing the state of the power controller."""
+
     def __init__(self, config_manager_object):
         self.config_manager = config_manager_object
         self.config = self.config_manager.active_config
@@ -172,16 +167,15 @@ class UtilityFunctions:
         self.housekeeping()
 
     def load_state_files(self):
-        """ Load the availabke state from the JSON files   """
-
+        """Load the availabke state from the JSON files."""
         # Look in the state_data subdirectory for the all the available state files
-        state_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state_data")
+        state_data_dir = Path(__file__).resolve().parent / "state_data"
 
         # Initialize the state list
         self.state_items.clear()
 
-        if os.path.exists(state_data_dir) and os.path.isdir(state_data_dir):
-            json_files = sorted([f for f in os.listdir(state_data_dir) if f.endswith('.json')])
+        if Path(state_data_dir).exists() and Path(state_data_dir).is_dir():
+            json_files = sorted([f.name for f in Path(state_data_dir).iterdir() if f.is_file() and f.name.endswith(".json")])
 
             # Show a warning if we have no state data
             if not json_files:
@@ -192,18 +186,18 @@ class UtilityFunctions:
                     # Skip hidden files
                     continue
 
-                file_path = os.path.join(state_data_dir, file_name)
+                file_path = Path(state_data_dir) / file_name
 
                 self.log_message(f"Attempting to load state file: {file_path}.", "debug")
 
                 try:
-                    with open(file_path, "r", encoding="utf-8") as file:
+                    with Path(file_path).open(encoding="utf-8") as file:
                         # Append the state item to the list
                         state_item = json.load(file)
                         self.state_items.append(state_item)
                         self.log_message(f"Successfully loaded state item {idx+1} from {file_path}.", "debug")
 
-                        file_modified = os.path.getmtime(file_path)
+                        file_modified = Path(file_path).stat().st_mtime
                         if self.last_state_check is None or file_modified > self.last_state_check:
                             # If the file has been modified since the last check, update the last state check time
                             self.last_state_check = file_modified
@@ -217,8 +211,7 @@ class UtilityFunctions:
             self.selected_state = 0
 
     def get_selected_state(self, new_state_idx=None):
-        """ Return the selected state index. Reset if it's invalid """
-
+        """Return the selected state index. Reset if it's invalid."""
         # Set the new state index if provided
         if new_state_idx is not None:
             self.selected_state = new_state_idx
@@ -226,56 +219,52 @@ class UtilityFunctions:
         # No state items, nothing to do
         if len(self.state_items) == 0:
             self.selected_state = None
-        else:
-            # We have some state items in the array, make sure the new state index is valid
-            if self.selected_state is None or self.selected_state < 0:
-                self.selected_state = 0
-            elif self.selected_state >= len(self.state_items):
-                # If the selected state is out of range, reset it to the first one
-                self.selected_state = len(self.state_items) - 1
+        # We have some state items in the array, make sure the new state index is valid
+        elif self.selected_state is None or self.selected_state < 0:
+            self.selected_state = 0
+        elif self.selected_state >= len(self.state_items):
+            # If the selected state is out of range, reset it to the first one
+            self.selected_state = len(self.state_items) - 1
 
         return self.selected_state
 
     def save_state(self, state_item):
-        """ Save the current state to the JSON file. This assumes that the calling function has already validates the state file. """
-
-        state_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state_data", state_item["DeviceName"] + ".json")
+        """Save the current state to the JSON file. This assumes that the calling function has already validates the state file."""
+        state_file_path = Path(__file__).resolve().parent / "state_data" / (state_item["DeviceName"] + ".json")
         try:
-            with open(state_file_path, "w", encoding="utf-8") as file:
+            with state_file_path.open("w", encoding="utf-8") as file:
                 json.dump(state_item, file, indent=4)
                 self.log_message(f"Successfully saved state to {state_file_path}.", "debug")
-        except IOError as e:
+        except OSError as e:
             self.report_fatal_error(f"Error writing to {state_file_path}: {e}")
 
     def check_for_state_file_changes(self):
-        """ Check if the state files have changed since the last check. If they have, return true. """
-
+        """Check if the state files have changed since the last check. If they have, return true."""
         if self.last_state_check is None:
             return True
 
         # Get the last modified time of the state files
         # Look in the state_data subdirectory for the all the available state files
-        state_data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state_data")
+        state_data_dir = Path(__file__).resolve().parent / "state_data"
 
-        if os.path.exists(state_data_dir) and os.path.isdir(state_data_dir):
-            json_files = [f for f in os.listdir(state_data_dir) if f.endswith('.json')]
+        if state_data_dir.exists() and state_data_dir.is_dir():
+            json_files = [f for f in state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")]
 
-            for file_name in json_files:
-                if file_name.startswith("."):
+            for file_path in json_files:
+                if file_path.name.startswith("."):
                     # Skip hidden files
                     continue
 
-                file_path = os.path.join(state_data_dir, file_name)
-                file_modified = os.path.getmtime(file_path)
+                file_modified = file_path.stat().st_mtime
                 if file_modified > self.last_state_check:
                     # We have a more recent state file
                     return True
-                
+
         return False
 
     def housekeeping(self):
         """General housekeeping function to be called periodically. Will run every hours. Initialise the monitoring log file. If it exists, truncate it to the max number of lines. Returns True if changes were made, False otherwise."""
-
+        local_tz = datetime.now().astimezone().tzinfo
         return_value = False
         # Check if the configuration file has changed. Reload if it has.
         if self.config_manager.check_for_config_changes():
@@ -290,8 +279,8 @@ class UtilityFunctions:
 
         # Check if the last housekeeping was more than 1 hour ago
         if self.last_housekeeping is not None:
-            now = datetime.now()
-            if (now - self.last_housekeeping).total_seconds() < 3600:
+            now = datetime.now(local_tz)
+            if (now - self.last_housekeeping).total_seconds() < 3600:  # noqa: PLR2004
                 return return_value
 
         return_value = True
@@ -300,9 +289,9 @@ class UtilityFunctions:
         if self.config["Files"]["MonitoringLogFile"] is not None:
             file_path = self.config_manager.select_file_location(self.config["Files"]["MonitoringLogFile"])
 
-            if os.path.exists(file_path):
+            if Path(file_path).exists():
                 # Monitoring log file exists - truncate excess lines if needed.
-                with open(file_path, 'r', encoding='utf-8') as file:
+                with Path(file_path).open(encoding="utf-8") as file:
                     max_lines = self.config["Files"]["MonitoringLogFileMaxLines"]
 
                     if max_lines > 0:
@@ -313,17 +302,18 @@ class UtilityFunctions:
                             keep_lines = lines[-max_lines:] if len(lines) > max_lines else lines
 
                             # Overwrite the file with only the last 1000 lines
-                            with open(file_path, 'w', encoding="utf-8") as file:
-                                file.writelines(keep_lines)
+                            with Path(file_path).open("w", encoding="utf-8") as file2:
+                                file2.writelines(keep_lines)
 
                             self.log_message("Housekeeping of log file completed.", "debug")
 
         # Set the last housekeeping time to now
-        self.last_housekeeping = datetime.now()
+        self.last_housekeeping = datetime.now(local_tz)
         return return_value
 
     def log_message(self, message: str, verbosity: str):
         """Writes a log message to the console and/or a file based on verbosity settings."""
+        local_tz = datetime.now().astimezone().tzinfo
         config_file_setting_str = self.config["Files"]["LogFileVerbosity"]
         console_setting_str = self.config["Files"]["ConsoleVerbosity"]
 
@@ -338,7 +328,7 @@ class UtilityFunctions:
             "summary": 3,
             "detailed": 4,
             "debug": 5,
-            "all": 6
+            "all": 6,
         }
 
         config_file_setting = switcher.get(config_file_setting_str, 0)
@@ -363,15 +353,14 @@ class UtilityFunctions:
             file_path = self.config_manager.select_file_location(self.config["Files"]["MonitoringLogFile"])
             error_str = " ERROR" if verbosity == "error" else " WARNING" if verbosity == "warning" else ""
             if config_file_setting >= message_level and config_file_setting > 0:
-                with open(file_path, "a", encoding="utf-8") as file:
+                with Path(file_path).open("a", encoding="utf-8") as file:
                     if message == "":
                         file.write("\n")
                     else:
-                        file.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{process_str}{error_str}: {message}\n")
+                        file.write(f"{datetime.now(local_tz).strftime('%Y-%m-%d %H:%M:%S')}{process_str}{error_str}: {message}\n")
 
-    def report_fatal_error(self, message, report_stack=False, calling_function=None):
+    def report_fatal_error(self, message, report_stack=False, calling_function=None):  # noqa: FBT002
         """Report a fatal error and exit the program."""
-
         function_name = None
         if calling_function is None:
             stack = inspect.stack()
@@ -409,13 +398,13 @@ class UtilityFunctions:
         minutes = int((hours - hours_part) * 60)
         return f"{hours_part}:{minutes:02}"
 
-    def format_date_with_ordinal(self, date, show_time=False):
+    def format_date_with_ordinal(self, date, show_time=False):  # noqa: FBT002
         """Format a date with an ordinal suffix for the day - for example 14th April."""
         time_str = date.strftime(" %H:%M:%S")
 
         day = date.day
         # Determine the ordinal suffix
-        if 11 <= day <= 13:  # Special case for 11th, 12th, 13th
+        if 11 <= day <= 13:  # Special case for 11th, 12th, 13th  # noqa: PLR2004
             suffix = "th"
         else:
             suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
@@ -425,10 +414,11 @@ class UtilityFunctions:
         if show_time:
             return_str += time_str
         return return_str
-    
+
     def generate_html_page(self, text):
         """
         Generate a complete HTML page with the given text properly formatted.
+
         Newlines in the text will be replaced with <br> tags.
         """
         # Escape special HTML characters and replace newlines with <br>
@@ -470,10 +460,11 @@ class UtilityFunctions:
     def get(self, attribute_name):
         """
         Get the value of an attribute from the UtilityFunctions class.
+
         :param attribute_name: The name of the attribute to retrieve.
         :return: The value of the attribute, or None if it doesn't exist.
         """
-        return getattr(self, attribute_name, None)    
+        return getattr(self, attribute_name, None)
 
     def __setitem__(self, index, value):
         """Allows setting values in the state dictionary using square brackets."""
