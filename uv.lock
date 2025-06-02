@@ -177,6 +177,7 @@ dependencies = [
     { name = "gunicorn" },
     { name = "pyyaml" },
     { name = "requests" },
+    { name = "sc-utility" },
     { name = "wheel" },
 ]
 
@@ -187,6 +188,7 @@ requires-dist = [
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "requests", specifier = ">=2.32.3" },
+    { name = "sc-utility", specifier = ">=1.0.4" },
     { name = "wheel", specifier = ">=0.45.1" },
 ]
 
@@ -220,6 +222,30 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/63/70/2bf7780ad2d390a8d301ad0b550f1581eadbd9a20f896afe06353c2a2913/requests-2.32.3.tar.gz", hash = "sha256:55365417734eb18255590a9ff9eb97e9e1da868d4ccd6402399eaf68af20a760", size = 131218, upload-time = "2024-05-29T15:37:49.536Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f9/9b/335f9764261e915ed497fcdeb11df5dfd6f7bf257d4a6a2a686d80da4d54/requests-2.32.3-py3-none-any.whl", hash = "sha256:70761cfe03c773ceb22aa2f671b4757976145175cdfca038c02654d061d6dcc6", size = 64928, upload-time = "2024-05-29T15:37:47.027Z" },
+]
+
+[[package]]
+name = "sc-utility"
+version = "1.0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cerberus" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "tzdata" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fd/d7/318f68fc7f82fdedfe229f3adb08e3f61d1161fb5de7f1f67bf3ec34df1d/sc_utility-1.0.4.tar.gz", hash = "sha256:6fd55c80874000e43219cb9fbbcf67de57c4b7b1ff01b80b9df7213fd2a728e5", size = 8364, upload-time = "2025-06-02T15:30:49.777Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cd/9c/74344417d90026dde54e608a8b58a9d344b190bd6f60d64ed0b8c3da2790/sc_utility-1.0.4-py3-none-any.whl", hash = "sha256:628c7bc7e6797663c4335635763aa67b544899b11eddc2574bfb4af4991b2621", size = 8530, upload-time = "2025-06-02T15:30:48.289Z" },
+]
+
+[[package]]
+name = "tzdata"
+version = "2025.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/95/32/1a225d6164441be760d75c2c42e2780dc0873fe382da3e98a2e1e48361e5/tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9", size = 196380, upload-time = "2025-03-23T13:54:43.652Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5c/23/c7abc0ca0a1526a0774eca151daeb8de62ec457e77262b66b359c3c7679e/tzdata-2025.2-py2.py3-none-any.whl", hash = "sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8", size = 347839, upload-time = "2025-03-23T13:54:41.845Z" },
 ]
 
 [[package]]

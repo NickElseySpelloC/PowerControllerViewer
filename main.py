@@ -1,10 +1,20 @@
 """AmberPowerController web app based on Flask."""
+import sys
 from pathlib import Path
 
 from flask import Flask, request, send_from_directory
+from sc_utility import SCConfigManager, SCLogger
 
-from utility import ConfigManager, UtilityFunctions
-from views import register_utility_func, views
+from config_schemas import ConfigSchema
+from helper import AmberHelper
+from views import register_support_classes, views
+
+CONFIG_FILE = "config.yaml"
+
+# Define globals for config and logger classes
+config = None
+logger = None
+helper = None
 
 # Initialize the Flask application
 # Import the views module
@@ -12,40 +22,71 @@ from views import register_utility_func, views
 app = Flask(__name__)
 app.register_blueprint(views, url_prefix="/")
 
-# Create an instance of ConfigManager
-system_config = ConfigManager()
-
-# Create an instance of the PowerControllerState
-utility_funcs = UtilityFunctions(system_config)
-
-# Register the PowerControllerState with the views module
-register_utility_func(utility_funcs)
 
 @app.errorhandler(404)
-def handle_404_error():
+def handle_404_error(error):
     """Handle 404 errors and log the requested URL."""
     requested_url = request.url  # Get the URL that caused the 404 error
-    utility_funcs.log_message(f"Server error 404: The requested URL was not found: {requested_url}", "detailed")
+    logger.log_message(f"Server error {error}: The requested URL was not found: {requested_url}", "detailed")
     return "Invalid URL.", 404
 
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Handle all uncaught exceptions."""
     # Log the exception (optional)
-    error_message = utility_funcs.report_fatal_error(f"An error occurred: {e!s}", report_stack=True)
+    error_message = logger.log_fatal_error(f"An error occurred: {e!s}", report_stack=True)
 
     # Return a custom error response
-    return utility_funcs.generate_html_page(error_message), 500
+    return helper.generate_html_page(error_message), 500
 
 @app.route("/favicon.ico")
 def favicon():
     """Serve the favicon."""
     return send_from_directory(str(Path(app.root_path) / "static"), "favicon.ico", mimetype="image/vnd.microsoft.icon")
 
-if __name__ == "__main__":
-    HostingIP = utility_funcs.config["Website"]["HostingIP"] or "127.0.0.1"
-    HostingPort = utility_funcs.config["Website"]["Port"] or 8000
-    DebugMode = utility_funcs.config["Website"]["DebugMode"] or False
+def main():
+    """Main function to run the Flask application."""
+    # Get our default schema, validation schema, and placeholders
+    global config   # noqa: PLW0603
+    global logger   # noqa: PLW0603
+    global helper   # noqa: PLW0603
+    schemas = ConfigSchema()
 
-    utility_funcs.log_message(f"Starting the PowerController web application on {HostingIP}:{HostingPort} for process ID {utility_funcs.get('process_id')}", "summary")
-    app.run(debug=DebugMode, host=HostingIP, port=HostingPort)
+    # Initialize the SC_ConfigManager class
+    try:
+        config = SCConfigManager(
+            config_file=CONFIG_FILE,
+            default_config=schemas.default,  # Replace with your default config if needed
+            validation_schema=schemas.validation,  # Replace with your validation schema if needed
+            placeholders=schemas.placeholders  # Replace with your placeholders if needed
+        )
+    except RuntimeError as e:
+        print(f"Configuration file error: {e}", file=sys.stderr)
+        return
+
+    # Initialize the SC_Logger class
+    try:
+        logger = SCLogger(config.get_logger_settings())
+    except RuntimeError as e:
+        print(f"Logger initialisation error: {e}", file=sys.stderr)
+        return
+
+    # Setup email
+    logger.register_email_settings(config.get_email_settings())
+
+    # Create the AmberHelper class
+    helper = AmberHelper(config, logger)
+
+    # Register the support functions with the views module
+    register_support_classes(config, logger, helper)
+
+    hosting_ip = config.get("Website", "HostingIP", default="127.0.0.1")
+    hosting_port = config.get("Website", "Port", default=8000)
+    debug_mode = config.get("Website", "DebugMode", default=False)
+
+    logger.log_message(f"Starting the PowerController web application on {hosting_ip}:{hosting_port} for process ID {logger.get_process_id()}", "summary")
+    app.run(debug=debug_mode, host=hosting_ip, port=hosting_port)
+
+if __name__ == "__main__":
+    """Run the main function to start the Flask application."""
+    main()
