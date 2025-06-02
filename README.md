@@ -16,7 +16,7 @@ Windows: `pip install uv`
 The shell script used to run the PowerController (*PowerControllerUI.sh*) is uses the *uv sync* command to ensure that all the prerequitie Python packages are installed in the virtual environment.
 
 2. Copy the PowerControllerUI folder and including sub-directories to a new folder, for example */home/pi/scripts/PowerControllerUI*
-3. Rename the _PowerControllerUIConfig.yaml.example_ file to _PowerControllerUIConfig.yaml_ file and at review the following settings:
+3. Rename the _config.yaml.example_ file to _config.yaml_ file and at review the following settings:
 
 ## Configuration File 
 
@@ -29,10 +29,11 @@ Website:
     AccessKey: <Optional access key>
 
 Files:
-    MonitoringLogFile: PowerControllerUI.log
-    MonitoringLogFileMaxLines: 200
+    LogfileName: logfile.log
+    LogProcessID: True
+    LogfileMaxLines: 200
     # How much information do we write to the log file. One of: none; error; warning; summary; detailed; debug; all
-    LogFileVerbosity: detailed
+    LogfileVerbosity: detailed
     # How much information do we write to the console. One of: error; warning; summary; detailed; debug; all
     ConsoleVerbosity: detailed
 ```
@@ -50,9 +51,10 @@ Files:
 
 | Parameter | Description | 
 |:--|:--|
-| MonitoringLogFile | A text log file that records progress messages and warnings. | 
-| MonitoringLogFileMaxLines| Maximum number of lines to keep in the MonitoringLogFileMaxLines. If zero, file will never be truncated. | 
-| LogFileVerbosity | The level of detail captured in the MonitoringLogFile. One of: <br>* none<br>* error<br>* warning<br>* summary<br>* detailed<br>* debug<br>* all | 
+| LogfileName | A text log file that records progress messages and warnings. | 
+| LogProcessID | If True, include the process ID in the log entries. | 
+| LogfileMaxLines| Maximum number of lines to keep in the MonitoringLogFileMaxLines. If zero, file will never be truncated. | 
+| LogfileVerbosity | The level of detail captured in the MonitoringLogFile. One of: <br>* none<br>* error<br>* warning<br>* summary<br>* detailed<br>* debug<br>* all | 
 | ConsoleVerbosity | Controls the amount of information written to the console. One of: <br>* error<br>* warning<br>* summary<br>* detailed<br>* debug<br>* all <br>Errors are written to stderr all other messages are written to stdout | 
 
 # Running the web app
