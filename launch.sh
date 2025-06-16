@@ -1,8 +1,8 @@
 #!/bin/bash
 : '=======================================================
-Power Controller Web App
+Application Launcher
 
-Run the web site
+Requires Python and UV to be installed
 =========================================================='
 
 #User parameters

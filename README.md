@@ -13,7 +13,7 @@ Windows: `inget install python3 --source winget --scope machine`
 macOS: `brew install uvicorn`
 Windows: `pip install uv`
 
-The shell script used to run the PowerController (*PowerControllerUI.sh*) is uses the *uv sync* command to ensure that all the prerequitie Python packages are installed in the virtual environment.
+The shell script used to run the web app (*launch.sh*) is uses the *uv sync* command to ensure that all the prerequitie Python packages are installed in the virtual environment.
 
 2. Copy the PowerControllerUI folder and including sub-directories to a new folder, for example */home/pi/scripts/PowerControllerUI*
 3. Rename the _config.yaml.example_ file to _config.yaml_ file and at review the following settings:
@@ -54,8 +54,8 @@ Files:
 | LogfileName | A text log file that records progress messages and warnings. | 
 | LogProcessID | If True, include the process ID in the log entries. | 
 | LogfileMaxLines| Maximum number of lines to keep in the MonitoringLogFileMaxLines. If zero, file will never be truncated. | 
-| LogfileVerbosity | The level of detail captured in the MonitoringLogFile. One of: <br>* none<br>* error<br>* warning<br>* summary<br>* detailed<br>* debug<br>* all | 
-| ConsoleVerbosity | Controls the amount of information written to the console. One of: <br>* error<br>* warning<br>* summary<br>* detailed<br>* debug<br>* all <br>Errors are written to stderr all other messages are written to stdout | 
+| LogfileVerbosity | The level of detail captured in the log file. One of: none; error; warning; summary; detailed; debug; all | 
+| ConsoleVerbosity | Controls the amount of information written to the console. One of: error; warning; summary; detailed; debug; all. Errors are written to stderr all other messages are written to stdout | 
 
 # Running the web app
 For the remaining steps below, we assume that:
@@ -64,7 +64,7 @@ For the remaining steps below, we assume that:
 * You haven't setup an AccessKey
 
 Use the shell script to run the web app. This uses UV to create the virtual environment and install the necessary Python packages:
-`./PowerControllerUI.sh`
+`./launch.sh`
 
 Go to http://192.168.1.20:8000/home to view the web page. You should see something like this:
 ![No State Data Available](images/no_state_data.png)
