@@ -10,6 +10,6 @@ dependencies = [
     "gunicorn>=23.0.0",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",
-    "sc-utility>=1.0.4",
+    "sc-utility>=2.0.5",
     "wheel>=0.45.1",
 ]

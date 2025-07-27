@@ -1,7 +1,6 @@
 """Contains the Flask views for the application."""
-from datetime import datetime
-
 from flask import Blueprint, jsonify, render_template, request
+from sc_utility import DateHelper, SCCommon
 
 views = Blueprint(__name__, "views")
 
@@ -10,20 +9,26 @@ config = None
 logger = None
 helper = None
 
+
 def register_support_classes(new_config, new_logger, new_helper):
     """Register the PowerControllerState instance."""
-    global config  # noqa: PLW0603
-    global logger  # noqa: PLW0603
-    global helper  # noqa: PLW0603
+    global config, logger, helper  # noqa: PLW0603
     config = new_config
     logger = new_logger
     helper = new_helper
 
+
 @views.route("/home")
 def home():
-    """Render the home page which shows the summary."""
+    """Render the home page which shows the summary.
+
+    Returns:
+        Rendered HTML template with the summary data.
+    """
     # Check if housekeeping is required
-    local_tz = datetime.now().astimezone().tzinfo
+    assert config is not None, "Config instance is not initialized."
+    assert logger is not None, "Logger instance is not initialized."
+    assert helper is not None, "Helper instance is not initialized."
     helper.housekeeping()
 
     client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
@@ -46,63 +51,73 @@ def home():
     else:
         state_next_idx = state_idx + 1
 
-
     # Deal with empty state_items array
     if state_idx is None:
         # Render the template with the summary data
         logger.log_message("Home: No states available.", "debug")
         return render_template("no_state.html")
-    last_save_time = datetime.strptime(helper[state_idx]["LastStateSaveTime"], "%Y-%m-%d %H:%M:%S").astimezone(local_tz)
+    last_save_time = DateHelper.parse_date(helper[state_idx]["LastStateSaveTime"], "%Y-%m-%d %H:%M:%S")
 
-    pump_start_time = None
-    if helper[state_idx]["IsDeviceRunning"]:
-        pump_start_time = datetime.strptime(helper[state_idx]["DeviceLastStartTime"], "%Y-%m-%d %H:%M:%S").astimezone(local_tz)
-    average_daily_usage = ((helper[state_idx]["EnergyUsed"] - helper[state_idx]["DailyData"][0]["EnergyUsed"]) / 7) / 1000
+    try:
+        pump_start_time = None
+        if helper[state_idx]["IsDeviceRunning"]:
+            pump_start_time = DateHelper.parse_date(helper[state_idx]["DeviceLastStartTime"], "%Y-%m-%d %H:%M:%S")
+        average_daily_usage = ((helper[state_idx]["EnergyUsed"] - helper[state_idx]["DailyData"][0]["EnergyUsed"]) / 7) / 1000
 
-    debug_message = None
-    if config.get("Website", "DebugMode") and config.get("Files", "LogFileVerbosity") == "all":
-        debug_message = f"Number of states: {len(helper.state_items)} <br>"
-        debug_message += f"Logging level: {config.get('Files', 'LogFileVerbosity')} <br>"
+        debug_message = None
+        if config.get("Website", "DebugMode") and config.get("Files", "LogFileVerbosity") == "all":
+            debug_message = f"Number of states: {len(helper.state_items)} <br>"
+            debug_message += f"Logging level: {config.get('Files', 'LogFileVerbosity')} <br>"
 
-    logger.log_message(f"Home: Process {logger.get_process_id()} rendering device {helper[state_idx]['DeviceName']} for client {client_ip}. State timestamp: {helper[state_idx]['LastStateSaveTime']}", "all")
-    average_price = helper[state_idx]["AveragePrice"] if helper[state_idx]["AveragePrice"] is not None else 0
+        logger.log_message(f"Home: Process {SCCommon.get_process_id()} rendering device {helper[state_idx]['DeviceName']} for client {client_ip}. State timestamp: {helper[state_idx]['LastStateSaveTime']}", "all")
+        average_price = helper[state_idx]["AveragePrice"] if helper[state_idx]["AveragePrice"] is not None else 0
 
-    # Build a dict object that we will use to pass the information to the web page
-    summary_page_data = {
-        "AccessKey": config.get("Website", "AccessKey"),
-        "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
-        "NextIndex": state_next_idx,
-        "NextDeviceName": helper[state_next_idx]["DeviceName"] if state_next_idx is not None else None,
-        "TimeNow": datetime.now(local_tz).strftime("%H:%M:%S"),
-        "DeviceName": helper[state_idx]["DeviceName"],
-        "StatusMessage": helper[state_idx]["LastStatusMessage"] or "Unknown",
-        "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
-        "PumpStatus": "Not running" if not helper[state_idx]["IsDeviceRunning"] else "Started at " + pump_start_time.strftime("%H:%M:%S"),
-        "RemaningRuntime": helper.hours_to_string(helper[state_idx]["DailyData"][0]["RemainingRuntimeToday"]),
-        "AverageDailyRuntime": helper.hours_to_string(helper[state_idx]["AverageRuntimePriorDays"]),
-        "CurrentPrice": round(helper[state_idx]["CurrentPrice"], 1),
-        "AverageEnergyPrice": round(average_price, 1),
-        "AverageDailyUsage": round(average_daily_usage, 2),
-        "AverageDailyCost": f"${average_daily_usage * average_price / 100:.2f}",
-        "HaveRunPlan": len(helper[state_idx]["TodayRunPlan"]) > 0,
-        "RunPlan": helper[state_idx]["TodayRunPlan"],
-        "ForecastPrice": round(helper[state_idx]["AverageForecastPrice"], 1),
-        "DebugMessage": debug_message,
-    }
-
-    # Render the template with the summary data
-    return render_template("index.html", page_data=summary_page_data)
+        # Build a dict object that we will use to pass the information to the web page
+        summary_page_data = {
+            "AccessKey": config.get("Website", "AccessKey"),
+            "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
+            "NextIndex": state_next_idx,
+            "NextDeviceName": helper[state_next_idx]["DeviceName"] if state_next_idx is not None else None,
+            "TimeNow": DateHelper.now_str(),
+            "DeviceName": helper[state_idx]["DeviceName"],
+            "StatusMessage": helper[state_idx]["LastStatusMessage"] or "Unknown",
+            "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
+            "PumpStatus": "Not running" if not helper[state_idx]["IsDeviceRunning"] else "Started at " + (pump_start_time.strftime("%H:%M:%S") if pump_start_time else "Unknown"),
+            "RemaningRuntime": helper.hours_to_string(helper[state_idx]["DailyData"][0]["RemainingRuntimeToday"]),
+            "AverageDailyRuntime": helper.hours_to_string(helper[state_idx]["AverageRuntimePriorDays"]),
+            "LivePrices": helper.get_state(state_idx, "LivePrices", default=True),
+            "CurrentPrice": round(helper[state_idx]["CurrentPrice"], 1),
+            "AverageEnergyPrice": round(average_price, 1),
+            "AverageDailyUsage": round(average_daily_usage, 2),
+            "AverageDailyCost": f"${average_daily_usage * average_price / 100:.2f}",
+            "HaveRunPlan": len(helper[state_idx]["TodayRunPlan"]) > 0,
+            "RunPlan": helper[state_idx]["TodayRunPlan"],
+            "ForecastPrice": round(helper[state_idx]["AverageForecastPrice"], 1),
+            "DebugMessage": debug_message,
+        }
+    except KeyError as e:
+        error_message = f"An error occurred while rendering the home page: {e}"
+        logger.log_message(error_message, "error")
+        return helper.generate_html_page(error_message), 500
+    else:
+        # Render the template with the summary data
+        return render_template("index.html", page_data=summary_page_data)
 
 
 @views.route("/daily")
-def day_detail():
+def day_detail():  # noqa: PLR0914
     """
     Render the daily date page for a given day passed as a query arg.
 
     For example: http://127.0.0.1:8000/daily?day=1
+
+    Returns:
+        Rendered HTML template with the summary data.
     """
     # Check if housekeeping is required
-    local_tz = datetime.now().astimezone().tzinfo
+    assert config is not None, "Config instance is not initialized."
+    assert logger is not None, "Logger instance is not initialized."
+    assert helper is not None, "Helper instance is not initialized."
     helper.housekeeping()
 
     client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
@@ -125,63 +140,75 @@ def day_detail():
     if state_idx is None:
         # Render the template with the summary data
         return render_template("no_state.html")
-    # Build the dict object that we will use to pass the information to the web page
-    day_data = helper[state_idx]["DailyData"][day]
-    page_date = datetime.strptime(day_data["Date"], "%Y-%m-%d").astimezone(local_tz)
-    actual_runtime = helper.hours_to_string(day_data["RuntimeToday"]) + " hours run"
-    if day_data["RemainingRuntimeToday"] > 0:
-        actual_runtime += ", " + helper.hours_to_string(day_data["RemainingRuntimeToday"]) + " hours remaining"
+    try:
+        # Build the dict object that we will use to pass the information to the web page
+        day_data = helper[state_idx]["DailyData"][day]
+        page_date = DateHelper.parse_date(day_data["Date"], "%Y-%m-%d")
+        actual_runtime = helper.hours_to_string(day_data["RuntimeToday"]) + " hours run"
+        if day_data["RemainingRuntimeToday"] > 0:
+            actual_runtime += ", " + helper.hours_to_string(day_data["RemainingRuntimeToday"]) + " hours remaining"
 
-    energy_usage = f"{day_data['EnergyUsed'] / 1000:.2f} kWh"
-    average_price = day_data["AveragePrice"] if day_data["AveragePrice"] is not None else 0
-    if average_price > 0:
-        energy_usage += f" at {average_price:.1f} c/kWh"
-    if (day_data["TotalCost"] or 0) > 0:
-        energy_usage += f" = ${day_data['TotalCost'] / 100:.2f}"
+        energy_usage = f"{day_data['EnergyUsed'] / 1000:.2f} kWh"
+        average_price = day_data["AveragePrice"] if day_data["AveragePrice"] is not None else 0
+        if average_price > 0:
+            energy_usage += f" at {average_price:.1f} c/kWh"
+        if (day_data["TotalCost"] or 0) > 0:
+            energy_usage += f" = ${day_data['TotalCost'] / 100:.2f}"
 
-    logger.log_message(f"Daily: rendering device {helper[state_idx]['DeviceName']} and day {page_date.strftime('%d/%m/%Y')} for client {client_ip}. State timestamp: {helper[state_idx]['LastStateSaveTime']}", "all")
+        logger.log_message(f"Daily: rendering device {helper[state_idx]['DeviceName']} and day {(page_date.strftime('%d/%m/%Y') if page_date else "Unknown")} for client {client_ip}. State timestamp: {helper[state_idx]['LastStateSaveTime']}", "all")
 
-    daily_data = {
-        "AccessKey": config.get("Website", "AccessKey"),
-        "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
-        "DeviceName": helper[state_idx]["DeviceName"],
-        "Date": page_date.strftime("%d/%m/%Y"),
-        "DateLong": helper.format_date_with_ordinal(page_date),
-        "Shortfall": helper.hours_to_string(day_data["PriorShortfall"]),
-        "TargetRuntime": helper.hours_to_string(day_data["TargetRuntime"]),
-        "ActualRuntime": actual_runtime,
-        "EnergyUsed": energy_usage,
-        "HaveRunPlan": len(day_data["DeviceRuns"]) > 0,
-        "CurrentDay": day,
-        "PreviousDay": day + 1 if day < 7 else None,
-        "NextDay": day - 1 if day > 0 else None,
-        }
+        daily_data = {
+            "AccessKey": config.get("Website", "AccessKey"),
+            "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
+            "DeviceName": helper[state_idx]["DeviceName"],
+            "Date": (page_date.strftime("%d/%m/%Y") if page_date else "Unknown"),
+            "DateLong": helper.format_date_with_ordinal(page_date),
+            "Shortfall": helper.hours_to_string(day_data["PriorShortfall"]),
+            "TargetRuntime": helper.hours_to_string(day_data["TargetRuntime"]),
+            "ActualRuntime": actual_runtime,
+            "EnergyUsed": energy_usage,
+            "HaveRunPlan": len(day_data["DeviceRuns"]) > 0,
+            "CurrentDay": day,
+            "PreviousDay": day + 1 if day < 7 else None,
+            "NextDay": day - 1 if day > 0 else None,
+            }
 
-    # Build the device_runs array
-    device_runs = []
-    for run in day_data["DeviceRuns"]:
-        start_time = datetime.strptime(run["StartTime"], "%Y-%m-%d %H:%M:%S").astimezone(local_tz).strftime("%H:%M")
-        if run["EndTime"] is None:
-            end_time = "Running"
-        else:
-            end_time = datetime.strptime(run["EndTime"], "%Y-%m-%d %H:%M:%S").astimezone(local_tz).strftime("%H:%M")
+        # Build the device_runs array
+        device_runs = []
+        for run in day_data["DeviceRuns"]:
+            start_time = DateHelper.parse_date(run["StartTime"], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")  # type: ignore[call-arg]
+            if run["EndTime"] is None:
+                end_time = "Running"
+            else:
+                end_time = DateHelper.parse_date(run["EndTime"], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")  # type: ignore[call-arg]
 
-        price = "Unknown" if run["Price"] is None else f"{round(run['Price'], 1)} c/kWh"
-        device_runs.append({
-            "Start": start_time,
-            "End": end_time,
-            "Price": price,
-        })
+            price = "Unknown" if run["Price"] is None else f"{round(run['Price'], 1)} c/kWh"
+            device_runs.append({
+                "Start": start_time,
+                "End": end_time,
+                "Price": price,
+            })
 
-    # Add the device_runs array to the daily_data dict
-    daily_data["DeviceRuns"] = device_runs
-
-    return render_template("daily.html", page_data=daily_data)
+        # Add the device_runs array to the daily_data dict
+        daily_data["DeviceRuns"] = device_runs
+    except KeyError as e:
+        error_message = f"An error occurred while rendering the daily data page: {e}"
+        logger.log_message(error_message, "error")
+        return helper.generate_html_page(error_message), 500
+    else:
+        return render_template("daily.html", page_data=daily_data)
 
 
 @views.route("/api/submit", methods=["POST"])
 def submit_data():
-    """Accept a JSON object via POST and validate it."""
+    """Accept a JSON object via POST and validate it.
+
+    Returns:
+        Rendered HTML template with the summary data.
+    """
+    assert config is not None, "Config instance is not initialized."
+    assert logger is not None, "Logger instance is not initialized."
+    assert helper is not None, "Helper instance is not initialized."
     if not request.is_json:
         logger.log_message("Submit Data: Content posted is not JSON data", "warning")
         return jsonify({"error": "Invalid content type. Expected JSON."}), 400
