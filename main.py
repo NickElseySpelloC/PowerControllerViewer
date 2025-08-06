@@ -1,4 +1,4 @@
-"""AmberPowerController web app based on Flask."""
+"""PowerControllerViewer web app based."""
 import sys
 from pathlib import Path
 
@@ -6,7 +6,7 @@ from flask import Flask, request, send_from_directory
 from sc_utility import SCCommon, SCConfigManager, SCLogger
 
 from config_schemas import ConfigSchema
-from helper import AmberHelper
+from helper import PowerControllerViewer
 from views import register_support_classes, views
 
 CONFIG_FILE = "config.yaml"
@@ -68,8 +68,15 @@ def favicon():
     return send_from_directory(str(Path(app.root_path) / "static"), "favicon.ico", mimetype="image/vnd.microsoft.icon")
 
 
-def main():
-    """Main function to run the Flask application."""
+def create_app():
+    """Create and configure the Flask application.
+
+    Raises:
+        RuntimeError: If there is an error in the configuration file or logger initialization.
+
+    Returns:
+        The configured Flask application instance.
+    """
     # Get our default schema, validation schema, and placeholders
     global config, logger, helper   # noqa: PLW0603
     schemas = ConfigSchema()
@@ -78,40 +85,50 @@ def main():
     try:
         config = SCConfigManager(
             config_file=CONFIG_FILE,
-            default_config=schemas.default,  # Replace with your default config if needed
-            validation_schema=schemas.validation,  # Replace with your validation schema if needed
-            placeholders=schemas.placeholders  # Replace with your placeholders if needed
+            default_config=schemas.default,
+            validation_schema=schemas.validation,
+            placeholders=schemas.placeholders
         )
     except RuntimeError as e:
         print(f"Configuration file error: {e}", file=sys.stderr)
-        return
+        raise
 
     # Initialize the SC_Logger class
     try:
         logger = SCLogger(config.get_logger_settings())
     except RuntimeError as e:
         print(f"Logger initialisation error: {e}", file=sys.stderr)
-        return
+        raise
 
     # Setup email
     logger.register_email_settings(config.get_email_settings())
 
-    # Create the AmberHelper class
-    helper = AmberHelper(config, logger)
+    # Create the PowerControllerViewer class
+    helper = PowerControllerViewer(config, logger)
 
     # Register the support functions with the views module
     register_support_classes(config, logger, helper)
-    assert logger is not None, "Logger instance is not initialized."
-    assert helper is not None, "Helper instance is not initialized."
 
+    return app
+
+
+def main_loop():
+    """Main function to run the Flask application directly."""
+    create_app()
+    assert config is not None, "Configuration instance is not initialized."
+    assert logger is not None, "Logger instance is not initialized."
     hosting_ip = config.get("Website", "HostingIP", default="127.0.0.1")
     hosting_port = config.get("Website", "Port", default=8000)
     debug_mode = config.get("Website", "DebugMode", default=False) or False
 
     logger.log_message(f"Starting the PowerController web application on {hosting_ip}:{hosting_port} for process ID {SCCommon.get_process_id()}", "summary")
-    app.run(debug=debug_mode, host=hosting_ip, port=hosting_port)  # type: ignore[attr-defined]
+    app.run(debug=debug_mode, host=hosting_ip, port=hosting_port)  # type: ignore[call-arg]
 
+
+# Initialize the app when the module is imported (for Gunicorn)
+if config is None:
+    create_app()
 
 if __name__ == "__main__":
     """Run the main function to start the Flask application."""
-    main()
+    main_loop()

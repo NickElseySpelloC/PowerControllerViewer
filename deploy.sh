@@ -4,7 +4,32 @@
 # Exit on error
 set -e
 
-TARGET_DIR=/Users/nick/scripts/AmberPowerControllerUI
+# Default target directory
+DEFAULT_TARGET_DIR=~/scripts/PowerControllerViewer
+TARGET_DIR="$DEFAULT_TARGET_DIR"
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -t|--target)
+      TARGET_DIR="$2"
+      shift 2
+      ;;
+    -h|--help)
+      echo "Usage: $0 [OPTIONS]"
+      echo "Options:"
+      echo "  -t, --target DIR    Set target directory (default: $DEFAULT_TARGET_DIR)"
+      echo "  -h, --help          Show this help message"
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Use -h or --help for usage information"
+      exit 1
+      ;;
+  esac
+done
+
 
 # List the files and folders to deploy (edit as needed)
 DEPLOY_FILES_AND_FOLDERS=(
@@ -15,6 +40,7 @@ DEPLOY_FILES_AND_FOLDERS=(
   "config_schemas.py"
   "pyproject.toml"
   "launch.sh"
+  "systemd_restart.sh"
   "images"
   "templates"
 )
@@ -49,8 +75,8 @@ done
 
 # Delete the specified files and folders
 for item in "${REMOVE_FILES_AND_FOLDERS[@]}"; do
-  echo "Removing $item if it exists..."
   if [ -e "$TARGET_DIR/$item" ]; then
+    echo "Removing $item..."
     rm -rf "$TARGET_DIR/$item"
     echo "Removed $item"
   fi

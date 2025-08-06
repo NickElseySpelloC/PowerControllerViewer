@@ -6,13 +6,13 @@
     {% if page_data['RefreshDelay'] > 0 %}
         <meta http-equiv="refresh" content="{{page_data['RefreshDelay']}}">
     {% endif %}
-    <title>Status summary for {{page_data['LastStatusMessage']}}</title>
+    <title>Status summary for {{page_data['DeviceName']}}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
 </head>
 <body>
     <div>
-        <h1>Status summary for the {{page_data['DeviceName']}}</h1>
+        <h1>Status summary for {{page_data['DeviceName']}}</h1>
         <p>Status as at {{ page_data['TimeNow'] }}: {{ page_data['StatusMessage'] }}</p>
 
         <!-- Navigation Buttons -->
@@ -23,7 +23,7 @@
                 Go to {{ page_data['NextDeviceName'] }} >>>
                 </a>
             {% endif %}
-            <a href="{{ url_for('views.day_detail', day=0, key=page_data['AccessKey']) }}" 
+            <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=0, key=page_data['AccessKey']) }}" 
                class="button">
                View {{page_data['DeviceName']}} Daily Data
             </a>
@@ -44,7 +44,15 @@
                     <td>Last Check</td><td>{{ page_data['LastCheck'] }}</td>
                 </tr>
                 <tr>
-                    <td>Pump Status</td><td>{{ page_data['PumpStatus'] }}</td>
+                    <td>Pump Status</td>
+                    <td>
+                        {% if page_data['IsDeviceRunning'] %} 
+                            <span class="circle green-circle"></span>
+                        {% else %}
+                            <span class="circle black-circle"></span>
+                        {% endif %}   
+                        {{ page_data['PumpStatus'] }}
+                    </td>
                 </tr>
                 <tr>
                     <td>Remaning Runtime Today</td><td>{{ page_data['RemaningRuntime'] }} hours</td>

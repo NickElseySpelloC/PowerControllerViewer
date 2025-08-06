@@ -71,3 +71,20 @@ table table th, table table td {
     cursor: not-allowed;
     pointer-events: none;
 }
+
+.circle {
+    display: inline-block;
+    width: 1.2em;
+    height: 1.2em;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin: 0 4px;
+}
+
+.green-circle {
+    background-color: #00c853; /* similar to 🟢 */
+}
+
+.black-circle {
+    background-color: #000000;
+}

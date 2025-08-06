@@ -1,6 +1,9 @@
 """Contains the Flask views for the application."""
-from flask import Blueprint, jsonify, render_template, request
+import operator
+
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 from sc_utility import DateHelper, SCCommon
+from werkzeug.datastructures import MultiDict
 
 views = Blueprint(__name__, "views")
 
@@ -18,6 +21,26 @@ def register_support_classes(new_config, new_logger, new_helper):
     helper = new_helper
 
 
+def validate_access_key(args: MultiDict[str, str]) -> bool:
+    """Validate the access key from the request arguments.
+
+    Args:
+        args (dict): The request arguments containing the access key.
+
+    Returns:
+        bool: True if the access key is valid, False otherwise.
+    """
+    assert config is not None, "Config instance is not initialized."
+    assert logger is not None, "Logger instance is not initialized."
+
+    if config.get("Website", "AccessKey") is not None:
+        access_key = args.get("key", default=None, type=str)
+        if access_key != config.get("Website", "AccessKey"):
+            logger.log_message(f"Invalid access key {access_key} used.", "warning")
+            return False
+    return True
+
+
 @views.route("/home")
 def home():
     """Render the home page which shows the summary.
@@ -31,83 +54,201 @@ def home():
     assert helper is not None, "Helper instance is not initialized."
     helper.housekeeping()
 
-    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
     args = request.args
 
     # Validate the access key if provided
-    if config.get("Website", "AccessKey") is not None:
-        access_key = args.get("key", default=None, type=str)
-        if access_key != config.get("Website", "AccessKey"):
-            logger.log_message(f"Home: Invalid access key {access_key} used.", "warning")
-            return "Access forbidden.", 403
+    if not validate_access_key(args):
+        return "Access forbidden.", 403
 
     # Set the state index based on the query parameter
-    new_state_idx = args.get("state_idx", default=None, type=int)
-    state_idx = helper.get_selected_state(new_state_idx)
-    if state_idx is None or len(helper.state_items) < 2:
-        state_next_idx = None
-    elif state_idx >= len(helper.state_items) - 1:
-        state_next_idx = 0
-    else:
-        state_next_idx = state_idx + 1
+    requested_state_idx = args.get("state_idx", default=None, type=int)
+    state_idx, state_next_idx = helper.validate_state_index(requested_state_idx)
 
     # Deal with empty state_items array
     if state_idx is None:
         # Render the template with the summary data
         logger.log_message("Home: No states available.", "debug")
         return render_template("no_state.html")
-    last_save_time = DateHelper.parse_date(helper[state_idx]["LastStateSaveTime"], "%Y-%m-%d %H:%M:%S")
 
     try:
-        pump_start_time = None
-        if helper[state_idx]["IsDeviceRunning"]:
-            pump_start_time = DateHelper.parse_date(helper[state_idx]["DeviceLastStartTime"], "%Y-%m-%d %H:%M:%S")
-        average_daily_usage = ((helper[state_idx]["EnergyUsed"] - helper[state_idx]["DailyData"][0]["EnergyUsed"]) / 7) / 1000
-
         debug_message = None
         if config.get("Website", "DebugMode") and config.get("Files", "LogFileVerbosity") == "all":
             debug_message = f"Number of states: {len(helper.state_items)} <br>"
             debug_message += f"Logging level: {config.get('Files', 'LogFileVerbosity')} <br>"
 
-        logger.log_message(f"Home: Process {SCCommon.get_process_id()} rendering device {helper[state_idx]['DeviceName']} for client {client_ip}. State timestamp: {helper[state_idx]['LastStateSaveTime']}", "all")
-        average_price = helper[state_idx]["AveragePrice"] if helper[state_idx]["AveragePrice"] is not None else 0
+        # Build the summary data for the homepage
+        state_type = helper.get_state(state_idx, "StateFileType", default="AmberPowerController")
+        if state_type == "AmberPowerController":
+            summary_page_data = build_amberpower_homepage(
+                state_idx=state_idx,
+                state_next_idx=state_next_idx,
+                debug_message=debug_message,
+            )
+            return render_template("home_amberpower.html", page_data=summary_page_data)
+
+        if state_type == "LightingControl":
+            summary_page_data = build_lightingcontrol_homepage(
+                state_idx=state_idx,
+                state_next_idx=state_next_idx,
+                debug_message=debug_message,
+            )
+            return render_template("home_lightingcontrol.html", page_data=summary_page_data)
+
+        error_message = f"Unsupported state file type: {state_type}"
+        logger.log_message(error_message, "error")
+        return helper.generate_html_page(error_message), 500
+
+    except KeyError as e:
+        logger.log_message(e, "error")
+        return helper.generate_html_page(e), 500
+
+
+def build_amberpower_homepage(state_idx: int, state_next_idx: int | None, debug_message: str | None = None):
+    """Build the homepage for a AmberPowerController state file.
+
+    Args:
+        state_idx (int): The index of the selected state which will be type AmberPowerController.
+        state_next_idx (int): The index of the next state.
+        debug_message (str | None): Optional debug message to include in the response.
+
+    Returns:
+        dict: A dictionary containing the summary data for the homepage.
+
+    Raises:
+        KeyError: If a required key is missing in the state data.
+    """
+    assert config is not None, "Config instance is not initialized."
+    assert logger is not None, "Logger instance is not initialized."
+    assert helper is not None, "Helper instance is not initialized."
+
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "Unknown"
+
+    try:
+        last_save_time_str = helper.get_state(state_idx, "LastStateSaveTime", default=DateHelper.now_str())
+        last_save_time = DateHelper.parse_date(last_save_time_str, "%Y-%m-%d %H:%M:%S")
+        logger.log_message(f"Home: Process {SCCommon.get_process_id()} rendering device {helper.get_state(state_idx, 'DeviceName')} of type AmberPowerController for client {client_ip}. State timestamp: {last_save_time}", "all")
+
+        pump_start_time = None
+        if helper.get_state(state_idx, "IsDeviceRunning"):
+            pump_start_time = DateHelper.parse_date(helper.get_state(state_idx, "DeviceLastStartTime"), "%Y-%m-%d %H:%M:%S")
+        average_daily_usage = ((helper.get_state(state_idx, "EnergyUsed", default=0) - helper.get_state(state_idx, "DailyData", 0, "EnergyUsed", default=0)) / 7) / 1000
+        average_price = helper.get_state(state_idx, "AveragePrice", default=0)
 
         # Build a dict object that we will use to pass the information to the web page
         summary_page_data = {
             "AccessKey": config.get("Website", "AccessKey"),
             "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
+            "CurrentIndex": state_idx,
             "NextIndex": state_next_idx,
-            "NextDeviceName": helper[state_next_idx]["DeviceName"] if state_next_idx is not None else None,
+            "NextDeviceName": helper.get_state(state_next_idx, "DeviceName", default="Unknown") if state_next_idx is not None else None,
             "TimeNow": DateHelper.now_str(),
-            "DeviceName": helper[state_idx]["DeviceName"],
-            "StatusMessage": helper[state_idx]["LastStatusMessage"] or "Unknown",
+            "DeviceName": helper.get_state(state_idx, "DeviceName", default="Unknown"),
+            "StatusMessage": helper.get_state(state_idx, "LastStatusMessage", default="Unknown"),
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
-            "PumpStatus": "Not running" if not helper[state_idx]["IsDeviceRunning"] else "Started at " + (pump_start_time.strftime("%H:%M:%S") if pump_start_time else "Unknown"),
-            "RemaningRuntime": helper.hours_to_string(helper[state_idx]["DailyData"][0]["RemainingRuntimeToday"]),
-            "AverageDailyRuntime": helper.hours_to_string(helper[state_idx]["AverageRuntimePriorDays"]),
+            "IsDeviceRunning": helper.get_state(state_idx, "IsDeviceRunning", default=False),
+            "PumpStatus": "Not running" if not helper.get_state(state_idx, "IsDeviceRunning", default=False) else "Started at " + (pump_start_time.strftime("%H:%M:%S") if pump_start_time else "Unknown"),
+            "RemaningRuntime": helper.hours_to_string(helper.get_state(state_idx, "DailyData", "RemainingRuntimeToday", 0, default=0)),
+            "AverageDailyRuntime": helper.hours_to_string(helper.get_state(state_idx, "AverageRuntimePriorDays", default=0)),
             "LivePrices": helper.get_state(state_idx, "LivePrices", default=True),
-            "CurrentPrice": round(helper[state_idx]["CurrentPrice"], 1),
+            "CurrentPrice": round(helper.get_state(state_idx, "CurrentPrice"), 1),
             "AverageEnergyPrice": round(average_price, 1),
             "AverageDailyUsage": round(average_daily_usage, 2),
             "AverageDailyCost": f"${average_daily_usage * average_price / 100:.2f}",
-            "HaveRunPlan": len(helper[state_idx]["TodayRunPlan"]) > 0,
-            "RunPlan": helper[state_idx]["TodayRunPlan"],
-            "ForecastPrice": round(helper[state_idx]["AverageForecastPrice"], 1),
+            "HaveRunPlan": len(helper.get_state(state_idx, "TodayRunPlan", default=[])) > 0,
+            "RunPlan": helper.get_state(state_idx, "TodayRunPlan", default=[]),
+            "ForecastPrice": round(helper.get_state(state_idx, "AverageForecastPrice", default=0), 1),
             "DebugMessage": debug_message,
-        }
+            }
     except KeyError as e:
-        error_message = f"An error occurred while rendering the home page: {e}"
-        logger.log_message(error_message, "error")
-        return helper.generate_html_page(error_message), 500
+        error_message = f"An error occurred while rendering a AmberPowerController home page: {e}"
+        raise KeyError(error_message) from e
     else:
-        # Render the template with the summary data
-        return render_template("index.html", page_data=summary_page_data)
+        return summary_page_data
+
+
+def build_lightingcontrol_homepage(state_idx: int, state_next_idx: int | None, debug_message: str | None = None):
+    """Build the homepage for a LightingControl state file.
+
+    Args:
+        state_idx (int): The index of the selected state which will be type LightingControl.
+        state_next_idx (int): The index of the next state.
+        debug_message (str | None): Optional debug message to include in the response.
+
+    Returns:
+        dict: A dictionary containing the summary data for the homepage.
+
+    Raises:
+        KeyError: If a required key is missing in the state data.
+    """
+    assert config is not None, "Config instance is not initialized."
+    assert logger is not None, "Logger instance is not initialized."
+    assert helper is not None, "Helper instance is not initialized."
+
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "Unknown"
+
+    try:
+        last_save_time_str = helper.get_state(state_idx, "LastStateSaveTime", default=None)
+        last_save_time = DateHelper.parse_date(last_save_time_str, "%Y-%m-%d %H:%M:%S") if last_save_time_str else DateHelper.now()
+        logger.log_message(f"Home: Process {SCCommon.get_process_id()} rendering device {helper.get_state(state_idx, 'DeviceName', default='Unknown')} of type LightingControl for client {client_ip}. State timestamp: {last_save_time}", "all")
+
+        # Build a dict object that we will use to pass the information to the web page
+        # For now just copy the SwitchStates part of the state file
+        summary_page_data = {
+            "AccessKey": config.get("Website", "AccessKey"),
+            "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
+            "CurrentIndex": state_idx,
+            "NextIndex": state_next_idx,
+            "DeviceName": helper.get_state(state_idx, "DeviceName", default="Unknown"),
+            "LastStatusMessage": helper.get_state(state_idx, "LastStatusMessage", default="Unknown"),
+            "NextDeviceName": helper.get_state(state_next_idx, "DeviceName", default="Unknown") if state_next_idx is not None else None,
+            "TimeNow": DateHelper.now_str(),
+            "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
+            "HaveSwitchStates": len(helper.get_state(state_idx, "SwitchStates", default=[])) > 0,
+            "SwitchStates": helper.get_state(state_idx, "SwitchStates", default=[]),
+            "HaveEvents": len(helper.get_state(state_idx, "SwitchEvents", default=[])) > 0,
+            "DebugMessage": debug_message,
+            "Schedules": helper.get_state(state_idx, "Schedules", default=[]),
+            }
+
+        # Now itterate through the days of week in the Schedules: Events: DaysOfWeek key
+        # Add a new DaysEnabled list to each event, listing all the days of the week and a true/false flag for each
+        for schedule in summary_page_data["Schedules"]:
+            for event in schedule["Events"]:
+                days_enabled = []
+                day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+                # Parse the DaysOfWeek string (e.g., "Sat,Sun,Tue" or "All")
+                days_of_week_str = event.get("DaysOfWeek", "")
+                if days_of_week_str == "All":
+                    enabled_days = day_names  # All days are enabled
+                else:
+                    enabled_days = [day.strip() for day in days_of_week_str.split(",") if day.strip()]
+
+                for day in day_names:
+                    days_enabled.append({
+                        "Day": day,
+                        "Enabled": day in enabled_days,
+                    })
+                event["DaysEnabled"] = days_enabled
+
+                # If there is a DatesOff key in the event, we need to process the list of dates
+                # Convert the date strings to datetime objects
+                if "DatesOff" in event and isinstance(event["DatesOff"], list):
+                    for rng in event["DatesOff"]:
+                        rng["StartDateAU"] = DateHelper.parse_date(rng["StartDate"], "%Y-%m-%d").strftime("%-d %b %y")  # type: ignore[attr-defined]
+                        rng["EndDateAU"] = DateHelper.parse_date(rng["EndDate"], "%Y-%m-%d").strftime("%-d %b %y")  # type: ignore[attr-defined]
+
+    except KeyError as e:
+        error_message = f"An error occurred while rendering a LightingControl home page: {e}"
+        raise KeyError(error_message) from e
+    else:
+        return summary_page_data
 
 
 @views.route("/daily")
-def day_detail():  # noqa: PLR0914
+def day_detail():
     """
-    Render the daily date page for a given day passed as a query arg.
+    Render the AmberPower daily date page for a given day passed as a query arg.
 
     For example: http://127.0.0.1:8000/daily?day=1
 
@@ -120,56 +261,107 @@ def day_detail():  # noqa: PLR0914
     assert helper is not None, "Helper instance is not initialized."
     helper.housekeeping()
 
-    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
     args = request.args
 
     # Validate the access key if provided
-    if config.get("Website", "AccessKey") is not None:
-        access_key = args.get("key", default=None, type=str)
-        if access_key != config.get("Website", "AccessKey"):
-            logger.log_message(f"Day Detail: Invalid access key {access_key} used.", "warning")
-            return "Access forbidden.", 403
+    if not validate_access_key(args):
+        return "Access forbidden.", 403
 
-    # Set the state index based on the query parameter
-    day = args.get("day", default=None, type=int)
-    if day is None or day < 0 or day > 7:
-        logger.log_message(f"Day Detail: Invalid day parameter {day} passed.", "warning")
-        return "Invalid day parameter. Must be between 0 and 7.", 400
+    # Set the state index and day based on the query parameter
+    requested_state_idx = args.get("state_idx", default=None, type=int)
+    requested_day = args.get("day", default=None, type=int)
+    state_idx, day, max_day = helper.validate_day_index(requested_state_idx, requested_day)
 
-    state_idx = helper.get_selected_state()
+    # If the state index is None, we cannot render the page, redirect to the home page
     if state_idx is None:
-        # Render the template with the summary data
-        return render_template("no_state.html")
+        logger.log_message("Daily: No valid state index, returning to home", "all")
+        return redirect(url_for("views.home"))
+
+    # If the day index is None, we cannot render the page, redirect to the home page but with a state index arg
+    if day is None:
+        logger.log_message(f"Daily: No valid day index, returning to home for state {state_idx}", "all")
+        return redirect(url_for("views.home", state_idx=state_idx))
+
+    try:
+        # Build the summary data for the daily page
+        state_type = helper.get_state(state_idx, "StateFileType", default="AmberPowerController")
+        if state_type == "AmberPowerController":
+            daily_data = build_amberpower_daily_data(
+                state_idx=state_idx,
+                day=day,
+                max_day=max_day,
+            )
+            return render_template("daily_amberpower.html", page_data=daily_data)
+
+        if state_type == "LightingControl":
+            daily_data = build_lightingcontrol_daily_data(
+                state_idx=state_idx,
+                day=day,
+                max_day=max_day,
+            )
+            return render_template("daily_lightingcontrol.html", page_data=daily_data)
+
+        error_message = f"Unsupported state file type: {state_type}"
+        logger.log_message(error_message, "error")
+        return helper.generate_html_page(error_message), 500
+
+    except KeyError as e:
+        logger.log_message(e, "error")
+        return helper.generate_html_page(e), 500
+
+
+def build_amberpower_daily_data(state_idx: int, day: int, max_day: int) -> dict:
+    """Build the daily data for a AmberPowerController state file.
+
+    Args:
+        state_idx (int): The index of the selected state which will be type AmberPowerController.
+        day (int): The day index to retrieve data for, already validated to be in range.
+        max_day (int): The maximum day index for validation.
+
+    Raises:
+        KeyError: If a required key is missing in the state data.
+
+    Returns:
+        dict: A dictionary containing the daily data for the specified day.
+    """
+    assert config is not None, "Config instance is not initialized."
+    assert logger is not None, "Logger instance is not initialized."
+    assert helper is not None, "Helper instance is not initialized."
+
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+
+    # Get the daily data for the specified day
     try:
         # Build the dict object that we will use to pass the information to the web page
-        day_data = helper[state_idx]["DailyData"][day]
-        page_date = DateHelper.parse_date(day_data["Date"], "%Y-%m-%d")
-        actual_runtime = helper.hours_to_string(day_data["RuntimeToday"]) + " hours run"
-        if day_data["RemainingRuntimeToday"] > 0:
-            actual_runtime += ", " + helper.hours_to_string(day_data["RemainingRuntimeToday"]) + " hours remaining"
+        day_data = helper.get_state(state_idx, "DailyData", day, default={})
+        page_date = DateHelper.parse_date(day_data.get("Date"), "%Y-%m-%d")
+        actual_runtime = helper.hours_to_string(day_data.get("RuntimeToday", 0) or 0) + " hours run"
+        if (day_data.get("RemainingRuntimeToday", 0) or 0) > 0:
+            actual_runtime += ", " + helper.hours_to_string(day_data.get("RemainingRuntimeToday", 0) or 0) + " hours remaining"
 
-        energy_usage = f"{day_data['EnergyUsed'] / 1000:.2f} kWh"
-        average_price = day_data["AveragePrice"] if day_data["AveragePrice"] is not None else 0
+        energy_usage = f"{day_data.get('EnergyUsed', 0) or 0 / 1000:.2f} kWh"
+        average_price = day_data.get("AveragePrice", 0) or 0
         if average_price > 0:
             energy_usage += f" at {average_price:.1f} c/kWh"
-        if (day_data["TotalCost"] or 0) > 0:
-            energy_usage += f" = ${day_data['TotalCost'] / 100:.2f}"
+        if (day_data.get("TotalCost", 0) or 0) > 0:
+            energy_usage += f" = ${day_data.get('TotalCost', 0) or 0 / 100:.2f}"
 
-        logger.log_message(f"Daily: rendering device {helper[state_idx]['DeviceName']} and day {(page_date.strftime('%d/%m/%Y') if page_date else "Unknown")} for client {client_ip}. State timestamp: {helper[state_idx]['LastStateSaveTime']}", "all")
+        logger.log_message(f"Daily: rendering device {helper.get_state(state_idx, 'DeviceName', default='Unknown')} and day {(page_date.strftime('%d/%m/%Y') if page_date else 'Unknown')} for client {client_ip}. State timestamp: {helper.get_state(state_idx, 'LastStateSaveTime')}", "all")
 
         daily_data = {
             "AccessKey": config.get("Website", "AccessKey"),
             "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
-            "DeviceName": helper[state_idx]["DeviceName"],
+            "CurrentIndex": state_idx,
+            "DeviceName": helper.get_state(state_idx, "DeviceName", default="Unknown"),
             "Date": (page_date.strftime("%d/%m/%Y") if page_date else "Unknown"),
             "DateLong": helper.format_date_with_ordinal(page_date),
-            "Shortfall": helper.hours_to_string(day_data["PriorShortfall"]),
-            "TargetRuntime": helper.hours_to_string(day_data["TargetRuntime"]),
+            "Shortfall": helper.hours_to_string(day_data.get("PriorShortfall", 0) or 0),
+            "TargetRuntime": helper.hours_to_string(day_data.get("TargetRuntime", 0) or 0),
             "ActualRuntime": actual_runtime,
             "EnergyUsed": energy_usage,
-            "HaveRunPlan": len(day_data["DeviceRuns"]) > 0,
+            "HaveRunPlan": len(day_data.get("DeviceRuns", [])) > 0,
             "CurrentDay": day,
-            "PreviousDay": day + 1 if day < 7 else None,
+            "PreviousDay": day + 1 if day < max_day else None,
             "NextDay": day - 1 if day > 0 else None,
             }
 
@@ -193,10 +385,62 @@ def day_detail():  # noqa: PLR0914
         daily_data["DeviceRuns"] = device_runs
     except KeyError as e:
         error_message = f"An error occurred while rendering the daily data page: {e}"
-        logger.log_message(error_message, "error")
-        return helper.generate_html_page(error_message), 500
+        raise KeyError(error_message) from e
     else:
-        return render_template("daily.html", page_data=daily_data)
+        return daily_data
+
+
+def build_lightingcontrol_daily_data(state_idx: int, day: int, max_day: int) -> dict:
+    """Build the daily data for a AmberPowerController state file.
+
+    Args:
+        state_idx (int): The index of the selected state which will be type AmberPowerController.
+        day (int): The day index to retrieve data for, already validated to be in range.
+        max_day (int): The maximum day index for validation.
+
+    Raises:
+        KeyError: If a required key is missing in the state data.
+
+    Returns:
+        dict: A dictionary containing the daily data for the specified day.
+    """
+    assert config is not None, "Config instance is not initialized."
+    assert logger is not None, "Logger instance is not initialized."
+    assert helper is not None, "Helper instance is not initialized."
+
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+
+    # We want to page throught the events in reverse order. Make a deep copy of the SwitchEvents list and reverse sort by Date
+    switch_events = helper.get_state(state_idx, "SwitchEvents", default=[])
+    switch_events.sort(key=operator.itemgetter("Date"), reverse=True)
+
+    # Get the daily data for the specified day
+    try:
+        # Build the dict object that we will use to pass the information to the web page
+        day_data = switch_events[day] or {}
+        page_date = DateHelper.parse_date(day_data.get("Date"), "%Y-%m-%d")  # pyright: ignore[reportArgumentType]
+
+        logger.log_message(f"Daily: rendering device {helper.get_state(state_idx, 'DeviceName', default='Unknown')} and day {(page_date.strftime('%d/%m/%Y') if page_date else 'Unknown')} for client {client_ip}. State timestamp: {helper.get_state(state_idx, 'LastStateSaveTime')}", "all")
+
+        daily_data = {
+            "AccessKey": config.get("Website", "AccessKey"),
+            "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
+            "CurrentIndex": state_idx,
+            "DeviceName": helper.get_state(state_idx, "DeviceName", default="Unknown"),
+            "Date": (page_date.strftime("%d/%m/%Y") if page_date else "Unknown"),
+            "DateLong": helper.format_date_with_ordinal(page_date),
+            "HaveEvents": len(day_data.get("Events", [])) > 0,
+            "Events": day_data.get("Events", []),
+            "CurrentDay": day,
+            "PreviousDay": day + 1 if day < max_day else None,
+            "NextDay": day - 1 if day > 0 else None,
+            }
+
+    except KeyError as e:
+        error_message = f"An error occurred while rendering the daily data page: {e}"
+        raise KeyError(error_message) from e
+    else:
+        return daily_data
 
 
 @views.route("/api/submit", methods=["POST"])
@@ -229,23 +473,40 @@ def submit_data():
         logger.log_message("Submit Data: Invalid JSON format. Expected a JSON object", "warning")
         return jsonify({"error": "Invalid JSON format. Expected a JSON object."}), 400
 
-    # Check for some required required keys and their types
-    required_keys = {
-        "LastStateSaveTime": str,
-        "ForecastRuntimeToday": (int, float),
-        "CurrentPrice": (int, float, None),
-        "EnergyUsed": (int, float, None),
-        "TodayRunPlan": (list, None),
-        "DailyData": list,
-    }
+    try:
+        state_type = data.get("StateFileType", "Unknown")
 
-    for key, expected_type in required_keys.items():
-        if key not in data:
-            logger.log_message(f"Submit Data: Missing required key: {key}", "warning")
-            return jsonify({"error": f"Missing required key: {key}"}), 400
-        if not isinstance(data[key], expected_type):
-            logger.log_message(f"Submit Data: Invalid type for key: {key}. Expected {expected_type.__name__}.", "warning")
-            return jsonify({"error": f"Invalid type for key: {key}. Expected {expected_type.__name__}."}), 400
+        if state_type not in {"AmberPowerController", "LightingControl"}:
+            logger.log_message(f"Submit Data: Invalid state type: {state_type}", "warning")
+            return jsonify({"error": f"Invalid state file type: {state_type}"}), 400
+
+        if state_type == "AmberPowerController":
+            # Check for some required required keys and their types
+            required_keys = {
+                "LastStateSaveTime": str,
+                "ForecastRuntimeToday": (int, float),
+                "CurrentPrice": (int, float, None),
+                "EnergyUsed": (int, float, None),
+                "TodayRunPlan": (list, None),
+                "DailyData": list,
+                }
+        elif state_type == "LightingControl":
+            # Check for some required required keys and their types
+            required_keys = {
+                "RandomOffsets": dict,
+                "SwitchStates": list,
+                }
+
+        for key, expected_type in required_keys.items():
+            if key not in data:
+                logger.log_message(f"Submit Data: Missing required key: {key}", "warning")
+                return jsonify({"error": f"Missing required key: {key}"}), 400
+            if not isinstance(data[key], expected_type):
+                logger.log_message(f"Submit Data: Invalid type for key: {key}. Expected {expected_type.__name__}.", "warning")
+                return jsonify({"error": f"Invalid type for key: {key}. Expected {expected_type.__name__}."}), 400
+    except KeyError as e:
+        logger.log_message(f"Submit Data: Missing required key: {e}", "warning")
+        return jsonify({"error": f"Missing required key: {e}"}), 400
 
     # Process the valid data (example: log it or save it)
     logger.log_message(f"Received valid state data for device: {data['DeviceName']}", "debug")

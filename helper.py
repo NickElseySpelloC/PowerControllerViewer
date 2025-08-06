@@ -1,8 +1,10 @@
 """General helper functions for the project."""
 
 import datetime as dt
+import fcntl
 import inspect
 import json
+import time
 import traceback
 from html import escape
 from pathlib import Path
@@ -11,8 +13,8 @@ from typing import Any
 from sc_utility import DateHelper, SCConfigManager, SCLogger
 
 
-class AmberHelper:
-    """General purpose helper functions for the Amber Power Controller UI."""
+class PowerControllerViewer:
+    """General purpose helper functions for the PowerControllerViewer."""
 
     def __init__(self, config: SCConfigManager, logger: SCLogger):
         self.config = config
@@ -20,8 +22,7 @@ class AmberHelper:
         self.last_housekeeping = None
         self.last_state_check = None
         self.last_state_filename_hash = None
-        self.state_items = []
-        self.selected_state = None
+        self.state_items = []   # List of state items loaded from JSON files
         # Perform initial housekeeping which will include loading the state files
         self.housekeeping()
 
@@ -50,9 +51,8 @@ class AmberHelper:
                 self.logger.log_message(f"Attempting to load state file: {file_path}.", "debug")
 
                 try:
-                    with Path(file_path).open(encoding="utf-8") as file:
-                        # Append the state item to the list
-                        state_item = json.load(file)
+                    state_item = self._safe_read_json(file_path)
+                    if state_item is not None:
                         self.state_items.append(state_item)
                         self.logger.log_message(f"Successfully loaded state item {idx + 1} from {file_path}.", "debug")
 
@@ -60,53 +60,188 @@ class AmberHelper:
                         if self.last_state_check is None or file_modified > self.last_state_check:
                             # If the file has been modified since the last check, update the last state check time
                             self.last_state_check = file_modified
+                    else:
+                        self.logger.log_message(f"Skipped empty or unreadable file: {file_path}.", "warning")
 
-                # To do
-                except json.JSONDecodeError as e:
-                    self.report_fatal_error(f"Error decoding JSON from {file_path}: {e}")
+                except (OSError, json.JSONDecodeError) as e:
+                    self.report_fatal_error(f"Error loading JSON from {file_path}: {e}")
 
-        # If we have loaded at least one state file, select the first one if our selector is None
-        if self.selected_state is None and len(self.state_items) > 0:
-            self.selected_state = 0
-
-    def get_selected_state(self, new_state_idx: int | None = None) -> int | None:
-        """Return the selected state index. Reset if it's invalid.
+    def validate_state_index(self, requested_state_idx: int | None = None) -> tuple[int | None, int | None]:
+        """Validate that a requested state index is within the valid range.
 
         Args:
-            new_state_idx (int, optional): The new state index to set. If None, it will not change the current selection.
+            requested_state_idx (int, optional): The requested state index to use. If None, the first available state will be returned.
 
         Returns:
-            int: The index of the selected state item or None if there are no state items.
+            result(int, int): The actual state index to use and the next_state_idx to use. Returns None if there are no state items.
         """
         # Set the new state index if provided
-        if new_state_idx is not None:
-            self.selected_state = new_state_idx
-
-        # No state items, nothing to do
+        max_state_idx = len(self.state_items) - 1
         if len(self.state_items) == 0:
-            self.selected_state = None
-        # We have some state items in the array, make sure the new state index is valid
-        elif self.selected_state is None or self.selected_state < 0:
-            self.selected_state = 0
-        elif self.selected_state >= len(self.state_items):
-            # If the selected state is out of range, reset it to the first one
-            self.selected_state = len(self.state_items) - 1
+            return None, None
 
-        return self.selected_state
+        # Set the actual state index based on the requested one
+        if requested_state_idx is None:
+            new_state_idx = 0
+        elif not isinstance(requested_state_idx, int):
+            self.logger.log_message(f"Invalid state index of type {type(requested_state_idx)} passed in url args, expected int.", "error")
+            new_state_idx = 0
+        elif requested_state_idx < 0:
+            new_state_idx = max_state_idx
+        elif requested_state_idx > max_state_idx:
+            new_state_idx = 0
+        else:
+            new_state_idx = requested_state_idx
+
+        # Now figure out the next state index. If we have 0 or 1 state items, there is no next state.
+        if max_state_idx < 1:
+            next_state_idx = None
+        else:
+            next_state_idx = new_state_idx + 1 if new_state_idx < max_state_idx else 0
+
+        return new_state_idx, next_state_idx
+
+    def validate_day_index(self, requested_state_idx: int | None = None, requested_day_idx: int | None = None) -> tuple[int | None, int | None, int | None]:
+        """Validate that a requested state index and day is within the valid range for a state entry.
+
+        Args:
+            requested_state_idx (int, optional): The requested state index to use. If None, the first valid state will be returned.
+            requested_day_idx (int, optional): The requested day index to use. If None, the first valid day will be returned.
+
+        Returns:
+            result(int, int, int): The actual state index; the day index to use; the maximum day index. Returns None if there are no state items of the required type.
+        """
+        """TO DO
+        - All state entries are now valid
+        - Just vaidate the state index first using validate_state_index()
+        - Then figure out max, min and next day for the selected state type
+        """
+        # Validate that the requested state index is OK
+        state_idx, _ = self.validate_state_index(requested_state_idx=requested_state_idx)
+
+        # If there are no valid state items, return None
+        if state_idx is None:
+            return None, None, None
+
+        # Validate state type and count how many day entries we have
+        state_type = self.get_state(state_idx, "StateFileType", default="AmberPowerController")
+        if state_type == "AmberPowerController":
+            max_day_idx = len(self.get_state(state_idx, "DailyData", default=[])) - 1
+        elif state_type == "LightingControl":
+            max_day_idx = len(self.get_state(state_idx, "SwitchEvents", default=[])) - 1
+        else:
+            self.logger.log_message(f"Unknown state type {state_type} for state index {state_idx}.", "error")
+            return None, None, None
+
+        # If there are no valid day entries, return None
+        if max_day_idx < 0:
+            return state_idx, None, None
+
+        # Validate the requested day index
+        if requested_day_idx is None:
+            day_idx = 0
+        elif not isinstance(requested_day_idx, int):
+            self.logger.log_message(f"Invalid day index of type {type(requested_day_idx)} passed in url args, expected int.", "error")
+            day_idx = 0
+        elif requested_day_idx < 0:
+            day_idx = max_day_idx
+        elif requested_day_idx > max_day_idx:
+            day_idx = 0
+        else:
+            day_idx = requested_day_idx
+
+        return state_idx, day_idx, max_day_idx
+
+    def _safe_read_json(self, file_path: Path, max_retries: int = 3, retry_delay: float = 0.1):
+        """Safely read JSON file with locking and retries.
+
+        Args:
+            file_path (Path): The path to the JSON file to read.
+            max_retries (int): Maximum number of retries for reading the file.
+            retry_delay (float): Delay in seconds between retries.
+
+        Raises:
+            OSError: If the file cannot be read after the maximum number of retries.
+            json.JSONDecodeError: If the file is not a valid JSON.
+
+        Returns:
+            dict | None: The parsed JSON data if successful, None if the file is empty or unreadable.
+        """
+        for attempt in range(max_retries):
+            try:
+                with file_path.open("r", encoding="utf-8") as file:
+                    fcntl.flock(file.fileno(), fcntl.LOCK_SH)
+                    try:
+                        file.seek(0, 2)  # Seek to end
+                        if file.tell() == 0:
+                            self.logger.log_message(f"File {file_path} is empty, skipping.", "warning")
+                            return None
+                        file.seek(0)  # Reset to beginning
+                        return json.load(file)
+                    finally:
+                        fcntl.flock(file.fileno(), fcntl.LOCK_UN)
+            except (OSError, json.JSONDecodeError) as e:
+                if attempt < max_retries - 1:
+                    self.logger.log_message(f"Read failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying...", "warning")
+                    time.sleep(retry_delay)
+                    continue
+                raise
+        return None
+
+    def _safe_write_json(self, file_path: Path, data: dict, max_retries: int = 3, retry_delay: float = 0.1):
+        """Safely write JSON file with atomic operations and locking.
+
+        Args:
+            file_path (Path): The path to the JSON file to write.
+            data (dict): The data to write to the JSON file.
+            max_retries (int): Maximum number of retries for writing the file.
+            retry_delay (float): Delay in seconds between retries.
+
+        Raises:
+            OSError: If the file cannot be written after the maximum number of retries.
+
+        Returns:
+            bool: True if the write was successful, False if the file was empty or unreadable
+        """
+        for attempt in range(max_retries):
+            try:
+                temp_file_path = file_path.with_suffix(".tmp")
+                with temp_file_path.open("w", encoding="utf-8") as file:
+                    fcntl.flock(file.fileno(), fcntl.LOCK_EX)
+                    try:
+                        json.dump(data, file, indent=4)
+                        file.flush()
+                    finally:
+                        fcntl.flock(file.fileno(), fcntl.LOCK_UN)
+
+                temp_file_path.replace(file_path)
+            except OSError as e:
+                if attempt < max_retries - 1:
+                    self.logger.log_message(f"Write failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying...", "warning")
+                    time.sleep(retry_delay)
+                    continue
+                raise
+            else:
+                return True
+        return False
 
     def save_state(self, state_item: dict):
         """Save the current state to the JSON file. This assumes that the calling function has already validates the state file.
 
         Args:
             state_item (dict): The state item to save. It should contain the "DeviceName" key to determine the filename.
+
+        Returns:
+            bool: True if the state was saved successfully, False if the file was empty or unreadable.
         """
         state_file_path = Path(__file__).resolve().parent / "state_data" / (state_item["DeviceName"] + ".json")
         try:
-            with state_file_path.open("w", encoding="utf-8") as file:
-                json.dump(state_item, file, indent=4)
-                self.logger.log_message(f"Successfully saved state to {state_file_path}.", "debug")
+            self._safe_write_json(state_file_path, state_item)
+            self.logger.log_message(f"Successfully saved state to {state_file_path}.", "debug")
         except OSError as e:
             self.report_fatal_error(f"Error writing to {state_file_path}: {e}")
+        else:
+            return True
 
     def check_for_state_file_changes(self) -> bool:
         """Check if the state files have changed since the last check.
@@ -164,7 +299,7 @@ class AmberHelper:
 
         # Check if the state files have changed. Reload if they have.
         if self.check_for_state_file_changes():
-            self.logger.log_message("Reloading state files for new changes.", "detailed")
+            self.logger.log_message("Reloading state files for new changes.", "debug")
             self.load_state_files()
             return_value = True
 
@@ -222,7 +357,7 @@ class AmberHelper:
             suffix = {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
 
         # Format the date with the ordinal suffix
-        return_str = date.strftime(f"%d{suffix} %B")
+        return_str = date.strftime(f"%-d{suffix} %B")
         if show_time:
             return_str += time_str
         return return_str
@@ -307,25 +442,11 @@ class AmberHelper:
         """
         return html_page
 
-    def __getitem__(self, key, default=None) -> Any:
-        """Allows access to the state dictionary using square brackets.
-
-        Args:
-            key (str): The key to retrieve from the state dictionary.
-            default (Any, optional): The default value to return if the key does not exist. Defaults to None.
-
-        Returns:
-            value (Any): The value associated with the key in the state dictionary.
-        """
-        try:
-            value = self.state_items[key]
-        except (KeyError, TypeError):
-            return default
-        else:
-            return value
-
     def get_state(self, *keys, default=None) -> Any:
         """Retrieve a value from the state dictionary using a sequence of nested keys.
+
+        If the key path does not exist, it returns the default value.
+        If the key path does exists, but the key value is None and the default provided is not None, it returns the default value.
 
         Example:
             value = get_state(state_idx, 'AveragePrice', default=0)
@@ -345,6 +466,8 @@ class AmberHelper:
         except (KeyError, TypeError):
             return default
         else:
+            if value is None and default is not None:
+                return default
             return value
 
     def __setitem__(self, index, value):

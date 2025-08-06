@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% if page_data['RefreshDelay'] > 0 %}
+        <meta http-equiv="refresh" content="page_data['RefreshDelay']">
+    {% endif %}
+    <title>{{page_data['DeviceName']}} light change events for [date]</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <div>
+        <h1>Daily light change events for {{page_data['DeviceName']}} for {{page_data['DateLong']}}</h1>
+
+        <!-- Navigation Buttons -->
+        <div>
+            <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=page_data['PreviousDay'], key=page_data['AccessKey']) }}" 
+               class="button{% if page_data['PreviousDay'] is none %} disabled{% endif %}">
+                Previous Day
+            </a>
+            <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=page_data['NextDay'], key=page_data['AccessKey']) }}" 
+               class="button{% if page_data['NextDay'] is none %} disabled{% endif %}"">
+                Next Day
+            </a>
+            <a href="{{ url_for('views.home', state_idx=page_data['CurrentIndex'], key=page_data['AccessKey']) }}" 
+                class="button">
+                Back to Summary
+            </a>
+    
+
+
+        </div>
+
+        <!-- Events Table -->
+         {% if page_data['HaveEvents'] %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Switch</th>
+                        <th>Schedule</th>
+                        <th>New State</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for event in page_data['Events'] %}
+                        <tr>
+                            <td>{{ event['Time'][:5] }}</td>
+                            <td>{{ event['Switch'] }}</td>
+                            <td>{{ event['Schedule'] }}</td>
+                            <td>
+                                {% if event['State'] == 'ON' %} 
+                                    <span class="circle green-circle"></span> On
+                                {% else %}
+                                    <span class="circle black-circle"></span> Off
+                                {% endif %}   
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No events recorded for this day.</p>
+        {% endif %}
+    </div>
+    <script 
+        type="text/javascript" 
+        src="{{ url_for('static', filename='index.js') }}"
+    ></script>
+</body>
+</html>

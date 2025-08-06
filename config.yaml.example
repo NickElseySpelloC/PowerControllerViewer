@@ -1,3 +1,6 @@
+# PowerControllerViewer example configuration file
+
+
 Website:
   HostingIP: 127.0.0.1
   Port: 8000

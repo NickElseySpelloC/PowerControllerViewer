@@ -19,6 +19,17 @@ fi
 
 cd $HomeDir
 
+# If we're running on a Raspberry Pi, make sure this venv environment is using Python 3.13 or later
+if [[ $(uname -m) == "armv7l" || $(uname -m) == "aarch64" ]]; then
+    # Check if the project has Python 3.13+ configured
+    if ! $UVCmd python pin --resolved 2>/dev/null | grep -q "^3\.1[3-9]\|^3\.[2-9][0-9]\|^[4-9]"; then
+        echo "Error: This project requires Python 3.13 or later to be configured on Raspberry Pi."
+        echo "Run 'uv python pin 3.13' to pin Python 3.13 to this project."
+        exit 1
+    fi
+fi
+
+
 # Make sure we're up to date
 $UVCmd sync 
 

@@ -42,34 +42,11 @@ class ConfigSchema:
             "Files": {
                 "type": "dict",
                 "schema": {
-                    "LogfileName": {
-                        "type": "string",
-                        "required": False,
-                        "nullable": True,
-                    },
+                    "LogfileName": {"type": "string", "required": False, "nullable": True},
+                    "LogfileMaxLines": {"type": "number", "required": False, "nullable": True, "min": 0, "max": 100000},
                     "LogProcessID": {"type": "boolean", "required": False, "nullable": True},
-                    "LogfileMaxLines": {
-                        "type": "number",
-                        "min": 0,
-                        "max": 100000,
-                    },
-                    "LogfileVerbosity": {
-                        "type": "string",
-                        "required": True,
-                        "allowed": [
-                            "none",
-                            "error",
-                            "warning",
-                            "summary",
-                            "detailed",
-                            "debug",
-                        ],
-                    },
-                    "ConsoleVerbosity": {
-                        "type": "string",
-                        "required": True,
-                        "allowed": ["error", "warning", "summary", "detailed", "debug"],
-                    },
+                    "LogfileVerbosity": {"type": "string", "required": True, "allowed": ["none", "error", "warning", "summary", "detailed", "debug", "all"]},
+                    "ConsoleVerbosity": {"type": "string", "required": True, "allowed": ["error", "warning", "summary", "detailed", "debug"]},
                 },
             },
         }

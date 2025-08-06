@@ -1,7 +1,7 @@
-# AmberPowerController Web Interface
-The simple Python web app is used to display current status and recent history from one or more AmberPowerController installations. Before using this app, please instal and run at least one instance of the AmberPowerController app, available here
+# PowerControllerViewer Web Interface
+The simple Python web app is used to display current status and recent history from one or more AmberPowerController and/or LightingControl installations. Before using this app, please install and run at least one instance of the one of these apps, available here
 
-https://github.com/NickElseySpelloC/AmberPowerController 
+https://github.com/NickElseySpelloC/
 
 # Basic Installation and Configuration
 1. Ensure that the basic prerequities are installed:
@@ -15,27 +15,28 @@ Windows: `pip install uv`
 
 The shell script used to run the web app (*launch.sh*) is uses the *uv sync* command to ensure that all the prerequitie Python packages are installed in the virtual environment.
 
-2. Copy the PowerControllerUI folder and including sub-directories to a new folder, for example */home/pi/scripts/PowerControllerUI*
+2. Copy the PowerControllerViewer folder and including sub-directories to a new folder, for example */home/pi/scripts/PowerControllerViewer*
 3. Rename the _config.yaml.example_ file to _config.yaml_ file and at review the following settings:
 
 ## Configuration File 
 
-```
+```yaml
 Website:
-    HostingIP: 0.0.0.0
-    Port: 8000
-    PageAutoRefresh: 15
-    DebugMode: True
-    AccessKey: <Optional access key>
+  HostingIP: 127.0.0.1
+  Port: 8000
+  PageAutoRefresh: 15
+  DebugMode: True
+  AccessKey: 
 
 Files:
-    LogfileName: logfile.log
-    LogProcessID: True
-    LogfileMaxLines: 200
-    # How much information do we write to the log file. One of: none; error; warning; summary; detailed; debug; all
-    LogfileVerbosity: detailed
-    # How much information do we write to the console. One of: error; warning; summary; detailed; debug; all
-    ConsoleVerbosity: detailed
+  LogfileName: logfile.log
+  # Include the process ID in the log entries
+  LogProcessID: True
+  LogfileMaxLines: 5000
+  # How much information do we write to the log file. One of: none; error; warning; summary; detailed; debug; all
+  LogfileVerbosity: detailed
+  # How much information do we write to the console. One of: error; warning; summary; detailed; debug; all
+  ConsoleVerbosity: summary
 ```
 ### Config Section: Website
 
@@ -45,7 +46,7 @@ Files:
 | Port: | The port to listen on, defaults to 8000.| 
 | PageAutoRefresh: | Delay in seconds before the summary pages automatically refresh. Defaults to 10 seconds. Set to blank or 0 to disable refresh. | 
 | DebugMode: | False by default. If True, an exceptions will be reported via the web brower. Set to True for testing, False for a production deployment. | 
-| AccessKey: | An optional alphanumeric key that is used to protect access to the web site. If specified, the key must be included in the website URL, for example: http://127.0.0.1:8000/home?key=abcdef123456. If you specify a key, the same key must also be set for the _WebsiteAccessKey_ parameter in the AmberPowerController application's configuration file.  | 
+| AccessKey: | An optional alphanumeric key that is used to protect access to the web site. If specified, the key must be included in the website URL, for example: http://127.0.0.1:8000/home?key=abcdef123456. If you specify a key, the same key must also be set for the _WebsiteAccessKey_ parameter in the sending application's configuration file.  | 
 
 #### Config Section: Files
 
@@ -69,7 +70,7 @@ Use the shell script to run the web app. This uses UV to create the virtual envi
 Go to http://192.168.1.20:8000/home to view the web page. You should see something like this:
 ![No State Data Available](images/no_state_data.png)
 
-Now go edit the _PowerControllerConfig.yaml_ config file for the AmberPowerController app. In the _DeviceType_ section, enter the details of this web app:
+Now go edit the _config.yaml_ config file for the AmberPowerController or LightingControl app. In the _Website_ section, enter the details of this web app:
 ```
   WebsiteBaseURL: http://192.168.1.20:8000
   WebsiteAccessKey: <Optional access key>
@@ -83,11 +84,13 @@ Run the PowerController app (or wait until it auto-runs from crontab). When it r
 # Running automatically from SystemDaemon
 Follow these steps to run a single thread of the web app in a non-production instance. Skip this and go to **Setup a Production Environment** if deploying to production.
 
-This uses the /home/pi/scripts/PowerControllerUI/PowerControllerUI.sh script to launch the web app.
+This uses the /home/pi/scripts/PowerControllerViewer/launch.sh script to launch the web app.
 
 ## 1. Create a systemd service file
 Create a new system service file:
-`sudo nano /etc/systemd/system/PowerControllerUI.service`
+```bash
+sudo nano /etc/systemd/system/PowerControllerViewer.service
+```
 
 Paste the following into the editor:
 ```
@@ -96,8 +99,8 @@ Description=PowerController Web Interface
 After=network.target
 
 [Service]
-ExecStart=/home/pi/scripts/PowerControllerUI/PowerControllerUI.sh 
-WorkingDirectory=/home/pi/scripts/PowerControllerUI
+ExecStart=/home/pi/scripts/PowerControllerViewer/launch.sh 
+WorkingDirectory=/home/pi/scripts/PowerControllerViewer
 StandardOutput=inherit
 StandardError=inherit
 Restart=always
@@ -111,77 +114,90 @@ WantedBy=multi-user.target
 Note: Restart=always ensures the service is restarted automatically if it crashes. RestartSec=10 creates a 10 second delay before the restart.
 
 ## 2. Enable the service to run at boot
-`sudo systemctl enable PowerControllerUI.service`
+```bash
+sudo systemctl enable PowerControllerViewer.service
+```
 
 Now start the service:
-`sudo systemctl start PowerControllerUI.service`
+```bash
+sudo systemctl start PowerControllerViewer.service
+```
 
 Check the service status or logs:
-`sudo systemctl status PowerControllerUI.service`
-`journalctl -u PowerControllerUI.service -b`
+```bash
+sudo systemctl status PowerControllerViewer.service
+journalctl -u PowerControllerViewer.service -b
+```
 
 # Setup a production Environment
-This section shows you how to do a production deployment of the PowerControllerUI web app on a RaspberryPi. This assumes that the web UI files have been deployed to _/home/pi/scripts/PowerControllerUI_. You may need to modify these steps for other enviroments (macOS, Windows, etc.). 
+This section shows you how to do a production deployment of the PowerControllerViewer web app on a RaspberryPi. This assumes:
+
+1. The web UI files have been deployed to _/home/pi/scripts/PowerControllerViewer_. You may need to modify these steps for other enviroments (macOS, Windows, etc.). 
+2. Your RaspberryPi IP address is 192.168.1.20 - change as required in the examples below. 
 
 ## 1. Install Prerequisites
-```
+```bash
 sudo apt update
 sudo apt install python3-pip python3-venv nginx
 ```
 
 ## 2. Activate the virtual environment and test Gunicorn manually
-```
-cd /home/pi/scripts/PowerControllerUI
+```bash
+cd /home/pi/scripts/PowerControllerViewer
 source .venv/bin/activate
-gunicorn --bind 127.0.0.1:8000 wsgi:app
+gunicorn --bind 192.168.1.20:8000 wsgi:app
 ```
 
 Visit http://192.168.1.20:8000/home to confirm it works. If you get an Access Denied message, add the Access Key that you specified in the config file, for example:
-http://127.0.0.1:8000/home?key=abcdef123456 
+http://192.168.1.20:8000/home?key=abcdef123456 
 
 Note: Use deactivate to exit from the virtual environment
 
 ## 3. Create a systemd service for Gunicorn
-`sudo nano /etc/systemd/system/PowerControllerUIProd.service`
+```bash
+sudo nano /etc/systemd/system/PowerControllerViewer.service
+```
 
 And paste the following into the editor:
 ```
 [Unit]
-Description=Gunicorn instance to serve the PowerControllerUI app
+Description=Gunicorn instance to serve the PowerControllerViewer app
 After=network.target
 
 [Service]
 User=pi
 Group=www-data
-WorkingDirectory=/home/pi/scripts/PowerControllerUI
-Environment="PATH=/home/pi/scripts/PowerControllerUI/venv/bin"
-ExecStart=/home/pi/scripts/PowerControllerUI/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 wsgi:app
+WorkingDirectory=/home/pi/scripts/PowerControllerViewer
+Environment="PATH=/home/pi/scripts/PowerControllerViewer/.venv/bin"
+ExecStart=/home/pi/scripts/PowerControllerViewer/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 wsgi:app
 
 [Install]
 WantedBy=multi-user.target
 ```
 
 Enable and start the service:
-```
+```bash
 sudo systemctl daemon-reload
-sudo systemctl enable PowerControllerUIProd
-sudo systemctl start PowerControllerUIProd
+sudo systemctl enable PowerControllerViewer
+sudo systemctl start PowerControllerViewer
 ```
 
 Check status:
-```
-sudo systemctl status PowerControllerUIProd
-journalctl -u PowerControllerUIProd.service -b
+```bash
+sudo systemctl status PowerControllerViewer
+journalctl -u PowerControllerViewer.service -b
 ```
 
 ## 4. Configure NGINX as a reverse proxy
-`sudo nano /etc/nginx/sites-available/PowerControllerUI`
+```bash
+sudo nano /etc/nginx/sites-available/PowerControllerViewer
+```
 
 And paste the following into the editor (replace 192.168.1.20 with the IP of your RaspberryPi):
-```
+```nginx
 server {
     listen 80;
-    server_name 192.168.86.34;
+    server_name 192.168.1.20;
 
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -192,20 +208,33 @@ server {
     }
 }
 ```
+
+Note: this assumes that nothing else is using port 80 on your RaspberryPi. If you already another app bound to that port (PiHole, Apache, etc.) then change the listen port in the config file above and remove the default nginx config so that it doesn't attempt to bind to port 80 at startup:
+```bash
+sudo rm /etc/nginx/sites-enabled/default
+```
+
 Enable the site:
-`sudo ln -s /etc/nginx/sites-available/PowerControllerUI /etc/nginx/sites-enabled`
+```bash
+sudo ln -s /etc/nginx/sites-available/PowerControllerViewer /etc/nginx/sites-enabled
+```
 
 Test the config:
-`sudo nginx -t`
+```bash
+sudo nginx -t
+```
 
 Reload and start the service:
-```
+```bash
 sudo systemctl daemon-reload
 sudo systemctl reload nginx
 ```
 
 Check the status:
-`systemctl status nginx.service`
+```bash
+systemctl status nginx.service
+```
+
 
 ## 5. Setup an SSL certificate
 Optionally, install an SSL certificate on nginx so that we can access the web app using https://
@@ -244,7 +273,7 @@ At the end you will see something like this:
 
 ### Add the SSL certificate keys to your nginx configuration file
 Edit the file:
-`sudo nano /etc/nginx/sites-available/PowerControllerUI`
+`sudo nano /etc/nginx/sites-available/PowerControllerViewer`
 
 And change the file so that it now looks like this:
 
