@@ -24,7 +24,7 @@
                class="button{% if page_data['NextDay'] is none %} disabled{% endif %}"">
                 Next Day
             </a>
-            <a href="{{ url_for('views.home', state_idx=page_data['CurrentIndex'], key=page_data['AccessKey']) }}" 
+            <a href="{{ url_for('views.summary', state_idx=page_data['CurrentIndex'], key=page_data['AccessKey']) }}" 
                 class="button">
                 Back to Summary
             </a>

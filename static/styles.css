@@ -10,6 +10,10 @@ h1 {
     color: #444;
 }
 
+a {
+    text-decoration: none;    
+}
+
 table {
     border-collapse: collapse;
     margin-top: 20px;

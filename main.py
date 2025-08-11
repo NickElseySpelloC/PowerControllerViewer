@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 from flask import Flask, request, send_from_directory
-from sc_utility import SCCommon, SCConfigManager, SCLogger
+from sc_utility import SCConfigManager, SCLogger
 
 from config_schemas import ConfigSchema
 from helper import PowerControllerViewer
@@ -71,14 +71,11 @@ def favicon():
 def create_app():
     """Create and configure the Flask application.
 
-    Raises:
-        RuntimeError: If there is an error in the configuration file or logger initialization.
-
     Returns:
         The configured Flask application instance.
     """
     # Get our default schema, validation schema, and placeholders
-    global config, logger, helper   # noqa: PLW0603
+    global config, logger, helper   # noqa: PLW0603, pylint: disable=global-statement
     schemas = ConfigSchema()
 
     # Initialize the SC_ConfigManager class
@@ -91,14 +88,14 @@ def create_app():
         )
     except RuntimeError as e:
         print(f"Configuration file error: {e}", file=sys.stderr)
-        raise
+        sys.exit(1)     # Exit with errorcode 1 so that launch.sh can detect it
 
     # Initialize the SC_Logger class
     try:
         logger = SCLogger(config.get_logger_settings())
     except RuntimeError as e:
         print(f"Logger initialisation error: {e}", file=sys.stderr)
-        raise
+        sys.exit(1)     # Exit with errorcode 1 so that launch.sh can detect it
 
     # Setup email
     logger.register_email_settings(config.get_email_settings())
@@ -121,7 +118,7 @@ def main_loop():
     hosting_port = config.get("Website", "Port", default=8000)
     debug_mode = config.get("Website", "DebugMode", default=False) or False
 
-    logger.log_message(f"Starting the PowerController web application on {hosting_ip}:{hosting_port} for process ID {SCCommon.get_process_id()}", "summary")
+    logger.log_message(f"Starting the PowerController web application on {hosting_ip}:{hosting_port}", "summary")
     app.run(debug=debug_mode, host=hosting_ip, port=hosting_port)  # type: ignore[call-arg]
 
 
@@ -130,5 +127,4 @@ if config is None:
     create_app()
 
 if __name__ == "__main__":
-    """Run the main function to start the Flask application."""
     main_loop()

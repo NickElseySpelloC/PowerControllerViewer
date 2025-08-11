@@ -17,8 +17,12 @@
 
         <!-- Navigation Buttons -->
         <div>
+            <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
+               class="button">
+               Home
+            </a>
             {% if page_data['NextIndex'] is not none %}
-                <a href="{{ url_for('views.home', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
+                <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
                 class="button">
                 Go to {{ page_data['NextDeviceName'] }} >>>
                 </a>
@@ -44,6 +48,12 @@
                 </tr>
                 <tr>
                     <td>Last Check</td><td>{{ page_data['LastCheck'] }}</td>
+                </tr>
+                <tr>
+                    <td>Dusk Today</td><td>{{ page_data['DuskTime'] }}</td>
+                </tr>
+                <tr>
+                    <td>Dawn Today</td><td>{{ page_data['DawnTime'] }}</td>
                 </tr>
 
                 {% if page_data['HaveSwitchStates'] %}

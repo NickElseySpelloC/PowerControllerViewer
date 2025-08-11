@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% if page_data['RefreshDelay'] > 0 %}
+        <meta http-equiv="refresh" content="{{page_data['RefreshDelay']}}">
+    {% endif %}
+    <title>Power Controller Viewer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <div>
+        <h2>Select a device to view</h2>
+        
+        <!-- List of states -->
+        <div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Device</th>
+                        <th>Type</th>
+                        <th>Last Update</th>                        
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for device in page_data['Devices'] %}
+                        <tr>
+                            <td style="vertical-align: middle;">
+                                <a href="{{ url_for('views.summary', state_idx=device['StateIndex'], key=page_data['AccessKey']) }}" >
+                                <b>{{ device['DeviceName'] }}</b>
+                                </a>
+                            </td>
+                            <td style="vertical-align: middle;"> {{ device['DeviceDescription'] }}</td>
+                            <td style="vertical-align: middle;"> {{ device['LastCheck'][:-3] }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        
+    </div>
+    <script 
+        type="text/javascript" 
+        src="{{ url_for('static', filename='index.js') }}"
+    ></script>
+</body>
+</html>

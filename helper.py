@@ -23,6 +23,7 @@ class PowerControllerViewer:
         self.last_state_check = None
         self.last_state_filename_hash = None
         self.state_items = []   # List of state items loaded from JSON files
+        self.config_last_check = DateHelper.now()
         # Perform initial housekeeping which will include loading the state files
         self.housekeeping()
 
@@ -110,11 +111,6 @@ class PowerControllerViewer:
 
         Returns:
             result(int, int, int): The actual state index; the day index to use; the maximum day index. Returns None if there are no state items of the required type.
-        """
-        """TO DO
-        - All state entries are now valid
-        - Just vaidate the state index first using validate_state_index()
-        - Then figure out max, min and next day for the selected state type
         """
         # Validate that the requested state index is OK
         state_idx, _ = self.validate_state_index(requested_state_idx=requested_state_idx)
@@ -291,8 +287,9 @@ class PowerControllerViewer:
         return_value = False
         # Check if the configuration file has changed. Reload if it has. Throws a RuntimeError if the config file is invalid.
         try:
-            if self.config.check_for_config_changes():
-                self.logger.log_message("Reloading config file for new changes.", "detailed")
+            config_timestamp = self.config.check_for_config_changes(self.config_last_check)
+            if config_timestamp:
+                self.reload_config()
                 return_value = True
         except RuntimeError as e:
             self.report_fatal_error(f"Error checking for config changes: {e}")
@@ -317,6 +314,26 @@ class PowerControllerViewer:
         # Set the last housekeeping time to now
         self.last_housekeeping = DateHelper.now()
         return return_value
+
+    def reload_config(self):
+        """Apply the updated configuration settings."""
+        self.logger.log_message("Reloading configuration...", "detailed")
+
+        try:
+            # First update the logger
+            logger_settings = self.config.get_logger_settings()
+            self.logger.initialise_settings(logger_settings)
+
+            # Then email settings
+            email_settings = self.config.get_email_settings()
+            if email_settings:
+                self.logger.register_email_settings(email_settings)
+
+        except RuntimeError as e:
+            self.logger.log_fatal_error(f"Error reloading and applying configuration changes: {e}")
+            return
+        else:
+            self.config_last_check = DateHelper.now()
 
     @staticmethod
     def hours_to_string(hours: float | None) -> str:

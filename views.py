@@ -2,7 +2,7 @@
 import operator
 
 from flask import Blueprint, jsonify, redirect, render_template, request, url_for
-from sc_utility import DateHelper, SCCommon
+from sc_utility import DateHelper
 from werkzeug.datastructures import MultiDict
 
 views = Blueprint(__name__, "views")
@@ -15,7 +15,7 @@ helper = None
 
 def register_support_classes(new_config, new_logger, new_helper):
     """Register the PowerControllerState instance."""
-    global config, logger, helper  # noqa: PLW0603
+    global config, logger, helper  # noqa: PLW0603, pylint: disable=global-statement
     config = new_config
     logger = new_logger
     helper = new_helper
@@ -41,9 +41,72 @@ def validate_access_key(args: MultiDict[str, str]) -> bool:
     return True
 
 
-@views.route("/home")
+@views.route("/")
 def home():
-    """Render the home page which shows the summary.
+    """Render the homepage which shows a list of all the available states.
+
+    Returns:
+        Rendered HTML template with the summary data.
+    """
+    # Check if housekeeping is required
+    assert config is not None, "Config instance is not initialized."
+    assert logger is not None, "Logger instance is not initialized."
+    assert helper is not None, "Helper instance is not initialized."
+    helper.housekeeping()
+
+    args = request.args
+
+    # Validate the access key if provided
+    if not validate_access_key(args):
+        return "Access forbidden.", 403
+
+    # Deal with empty state_items array
+    state_idx, _ = helper.validate_state_index(0)
+    if state_idx is None:
+        # Render the template with the summary data
+        logger.log_message("Home: No states available.", "debug")
+        return render_template("no_state.html")
+
+    home_page_data = {
+            "AccessKey": config.get("Website", "AccessKey"),
+            "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
+            "CurrentIndex": state_idx,
+            "TimeNow": DateHelper.now_str(),
+            "Devices": [],
+    }
+
+    # Now loop through the state_items and build the home page data
+    for state_idx, _ in enumerate(helper.state_items):
+        state_file_type = helper.get_state(state_idx, "StateFileType", default="AmberPowerController")
+        if state_file_type == "AmberPowerController":
+            if helper.get_state(state_idx, "DeviceType", default="PoolPump") == "PoolPump" or helper.get_state(state_idx, "DeviceType") == "HotWaterSystem":
+                device_description = "Amber Power Controller (Pool Pump)"
+            else:  # "AmberPowerController"
+                device_description = "Amber Power Controller"
+        else:   # "LightingControl"}
+            device_description = "Lighting Controller"
+
+        last_save_time_str = helper.get_state(state_idx, "LastStateSaveTime", default=DateHelper.now_str())
+        last_save_time = DateHelper.parse_date(last_save_time_str, "%Y-%m-%d %H:%M:%S")
+
+        device = {
+            "StateIndex": state_idx,
+            "DeviceName": helper.get_state(state_idx, "DeviceName", default="Unknown"),
+            "DeviceDescription": device_description,
+            "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
+        }
+        home_page_data["Devices"].append(device)
+    try:
+        return render_template("home.html", page_data=home_page_data)
+
+    except KeyError as e:
+        logger.log_message(e, "error")
+        return helper.generate_html_page(e), 500
+
+
+@views.route("/summary")
+def summary():
+    """Render the summary page which shows the summary.
 
     Returns:
         Rendered HTML template with the summary data.
@@ -84,7 +147,7 @@ def home():
                 state_next_idx=state_next_idx,
                 debug_message=debug_message,
             )
-            return render_template("home_amberpower.html", page_data=summary_page_data)
+            return render_template("summary_amberpower.html", page_data=summary_page_data)
 
         if state_type == "LightingControl":
             summary_page_data = build_lightingcontrol_homepage(
@@ -92,7 +155,7 @@ def home():
                 state_next_idx=state_next_idx,
                 debug_message=debug_message,
             )
-            return render_template("home_lightingcontrol.html", page_data=summary_page_data)
+            return render_template("summary_lightingcontrol.html", page_data=summary_page_data)
 
         error_message = f"Unsupported state file type: {state_type}"
         logger.log_message(error_message, "error")
@@ -126,7 +189,7 @@ def build_amberpower_homepage(state_idx: int, state_next_idx: int | None, debug_
     try:
         last_save_time_str = helper.get_state(state_idx, "LastStateSaveTime", default=DateHelper.now_str())
         last_save_time = DateHelper.parse_date(last_save_time_str, "%Y-%m-%d %H:%M:%S")
-        logger.log_message(f"Home: Process {SCCommon.get_process_id()} rendering device {helper.get_state(state_idx, 'DeviceName')} of type AmberPowerController for client {client_ip}. State timestamp: {last_save_time}", "all")
+        logger.log_message(f"Home: rendering device {helper.get_state(state_idx, 'DeviceName')} of type AmberPowerController for client {client_ip}. State timestamp: {last_save_time}", "all")
 
         pump_start_time = None
         if helper.get_state(state_idx, "IsDeviceRunning"):
@@ -147,7 +210,7 @@ def build_amberpower_homepage(state_idx: int, state_next_idx: int | None, debug_
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
             "IsDeviceRunning": helper.get_state(state_idx, "IsDeviceRunning", default=False),
             "PumpStatus": "Not running" if not helper.get_state(state_idx, "IsDeviceRunning", default=False) else "Started at " + (pump_start_time.strftime("%H:%M:%S") if pump_start_time else "Unknown"),
-            "RemaningRuntime": helper.hours_to_string(helper.get_state(state_idx, "DailyData", "RemainingRuntimeToday", 0, default=0)),
+            "RemaningRuntime": helper.hours_to_string(helper.get_state(state_idx, "DailyData", 0, "RemainingRuntimeToday", default=0)),
             "AverageDailyRuntime": helper.hours_to_string(helper.get_state(state_idx, "AverageRuntimePriorDays", default=0)),
             "LivePrices": helper.get_state(state_idx, "LivePrices", default=True),
             "CurrentPrice": round(helper.get_state(state_idx, "CurrentPrice"), 1),
@@ -160,7 +223,7 @@ def build_amberpower_homepage(state_idx: int, state_next_idx: int | None, debug_
             "DebugMessage": debug_message,
             }
     except KeyError as e:
-        error_message = f"An error occurred while rendering a AmberPowerController home page: {e}"
+        error_message = f"An error occurred while rendering a AmberPowerController summary page: {e}"
         raise KeyError(error_message) from e
     else:
         return summary_page_data
@@ -189,7 +252,7 @@ def build_lightingcontrol_homepage(state_idx: int, state_next_idx: int | None, d
     try:
         last_save_time_str = helper.get_state(state_idx, "LastStateSaveTime", default=None)
         last_save_time = DateHelper.parse_date(last_save_time_str, "%Y-%m-%d %H:%M:%S") if last_save_time_str else DateHelper.now()
-        logger.log_message(f"Home: Process {SCCommon.get_process_id()} rendering device {helper.get_state(state_idx, 'DeviceName', default='Unknown')} of type LightingControl for client {client_ip}. State timestamp: {last_save_time}", "all")
+        logger.log_message(f"Home: rendering device {helper.get_state(state_idx, 'DeviceName', default='Unknown')} of type LightingControl for client {client_ip}. State timestamp: {last_save_time}", "all")
 
         # Build a dict object that we will use to pass the information to the web page
         # For now just copy the SwitchStates part of the state file
@@ -202,6 +265,8 @@ def build_lightingcontrol_homepage(state_idx: int, state_next_idx: int | None, d
             "LastStatusMessage": helper.get_state(state_idx, "LastStatusMessage", default="Unknown"),
             "NextDeviceName": helper.get_state(state_next_idx, "DeviceName", default="Unknown") if state_next_idx is not None else None,
             "TimeNow": DateHelper.now_str(),
+            "DuskTime": helper.get_state(state_idx, "Dusk", default=None),
+            "DawnTime": helper.get_state(state_idx, "Dawn", default=None),
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
             "HaveSwitchStates": len(helper.get_state(state_idx, "SwitchStates", default=[])) > 0,
             "SwitchStates": helper.get_state(state_idx, "SwitchStates", default=[]),
@@ -239,7 +304,7 @@ def build_lightingcontrol_homepage(state_idx: int, state_next_idx: int | None, d
                         rng["EndDateAU"] = DateHelper.parse_date(rng["EndDate"], "%Y-%m-%d").strftime("%-d %b %y")  # type: ignore[attr-defined]
 
     except KeyError as e:
-        error_message = f"An error occurred while rendering a LightingControl home page: {e}"
+        error_message = f"An error occurred while rendering a LightingControl summary page: {e}"
         raise KeyError(error_message) from e
     else:
         return summary_page_data
@@ -272,7 +337,7 @@ def day_detail():
     requested_day = args.get("day", default=None, type=int)
     state_idx, day, max_day = helper.validate_day_index(requested_state_idx, requested_day)
 
-    # If the state index is None, we cannot render the page, redirect to the home page
+    # If the state index is None, we cannot render the page, redirect to the summary page
     if state_idx is None:
         logger.log_message("Daily: No valid state index, returning to home", "all")
         return redirect(url_for("views.home"))
@@ -339,12 +404,12 @@ def build_amberpower_daily_data(state_idx: int, day: int, max_day: int) -> dict:
         if (day_data.get("RemainingRuntimeToday", 0) or 0) > 0:
             actual_runtime += ", " + helper.hours_to_string(day_data.get("RemainingRuntimeToday", 0) or 0) + " hours remaining"
 
-        energy_usage = f"{day_data.get('EnergyUsed', 0) or 0 / 1000:.2f} kWh"
+        energy_usage = f"{(day_data.get('EnergyUsed', 0) or 0) / 1000:.2f} kWh"
         average_price = day_data.get("AveragePrice", 0) or 0
         if average_price > 0:
             energy_usage += f" at {average_price:.1f} c/kWh"
         if (day_data.get("TotalCost", 0) or 0) > 0:
-            energy_usage += f" = ${day_data.get('TotalCost', 0) or 0 / 100:.2f}"
+            energy_usage += f" = ${(day_data.get('TotalCost', 0) or 0) / 100:.2f}"
 
         logger.log_message(f"Daily: rendering device {helper.get_state(state_idx, 'DeviceName', default='Unknown')} and day {(page_date.strftime('%d/%m/%Y') if page_date else 'Unknown')} for client {client_ip}. State timestamp: {helper.get_state(state_idx, 'LastStateSaveTime')}", "all")
 
@@ -474,8 +539,8 @@ def submit_data():
         return jsonify({"error": "Invalid JSON format. Expected a JSON object."}), 400
 
     try:
-        state_type = data.get("StateFileType", "Unknown")
-
+        state_type = data.get("StateFileType", "AmberPowerController")
+        required_keys = {}
         if state_type not in {"AmberPowerController", "LightingControl"}:
             logger.log_message(f"Submit Data: Invalid state type: {state_type}", "warning")
             return jsonify({"error": f"Invalid state file type: {state_type}"}), 400
