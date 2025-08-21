@@ -347,11 +347,10 @@ class PowerControllerViewer:
         """
         if hours is None:
             return "00:00"
-        if hours < 0:
-            return "00:00"
-        hours_part = int(hours)
-        minutes = int((hours - hours_part) * 60)
-        return f"{hours_part}:{minutes:02}"
+        neg_symbol = "-" if hours < 0 else ""
+        hours_part = int(abs(hours))
+        minutes = int((abs(hours) - hours_part) * 60)
+        return f"{neg_symbol}{hours_part}:{minutes:02}"
 
     @staticmethod
     def format_date_with_ordinal(date: dt.date, show_time: bool | None = False):  # noqa: FBT001, FBT002
