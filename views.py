@@ -91,10 +91,34 @@ def home():
 
         device = {
             "StateIndex": state_idx,
+            "StateFileType": state_file_type,
             "DeviceName": helper.get_state(state_idx, "DeviceName", default="Unknown"),
             "DeviceDescription": device_description,
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
+            "IsDeviceRunning": None,
+            "Status": None
         }
+        # Figure out the IsDeviceRunning and Status
+        if state_file_type == "AmberPowerController":
+            device["IsDeviceRunning"] = helper.get_state(state_idx, "IsDeviceRunning")
+            remaining_runtime = helper.hours_to_string(helper.get_state(state_idx, "DailyData", 0, "RemainingRuntimeToday", default=0))
+            pump_start_time = None
+            if device["IsDeviceRunning"]:
+                pump_start_time = DateHelper.parse_date(helper.get_state(state_idx, "DeviceLastStartTime"), "%Y-%m-%d %H:%M:%S")
+                device["Status"] = f"On at {(pump_start_time.strftime("%H:%M") if pump_start_time else "Unknown")}, {remaining_runtime} remaining today."
+            else:
+                device["Status"] = f"Not running, {remaining_runtime} remaining today."
+        elif state_file_type == "LightingControl":
+            # Device is running if any light is on
+            device["IsDeviceRunning"] = False
+            switch_states = helper.get_state(state_idx, "SwitchStates", default=[])
+            on_count = 0
+            for switch in switch_states:
+                if switch.get("OutputState", "OFF") == "ON":
+                    device["IsDeviceRunning"] = True
+                    on_count += 1
+            device["Status"] = f"{on_count} lights are on"
+
         home_page_data["Devices"].append(device)
     try:
         return render_template("home.html", page_data=home_page_data)

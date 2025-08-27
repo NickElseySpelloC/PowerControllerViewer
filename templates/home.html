@@ -21,7 +21,8 @@
                     <tr>
                         <th>Device</th>
                         <th>Type</th>
-                        <th>Last Update</th>                        
+                        <th>Last Update</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -34,6 +35,14 @@
                             </td>
                             <td style="vertical-align: middle;"> {{ device['DeviceDescription'] }}</td>
                             <td style="vertical-align: middle;"> {{ device['LastCheck'][:-3] }}</td>
+                            <td style="vertical-align: middle;"> 
+                                {% if device['IsDeviceRunning'] %} 
+                                    <span class="circle green-circle"></span>
+                                {% else %}
+                                    <span class="circle black-circle"></span>
+                                {% endif %}
+                                {{ device['Status'] }}
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>

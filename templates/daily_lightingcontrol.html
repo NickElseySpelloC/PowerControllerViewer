@@ -45,7 +45,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for event in page_data['Events'] %}
+                    {% for event in page_data['Events']|reverse %}
                         <tr>
                             <td>{{ event['Time'][:5] }}</td>
                             <td>{{ event['Switch'] }}</td>
