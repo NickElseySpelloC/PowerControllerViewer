@@ -16,6 +16,10 @@
 
         <!-- Navigation Buttons -->
         <div>
+            <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
+               class="button">
+               Home
+            </a>
             <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=page_data['PreviousDay'], key=page_data['AccessKey']) }}" 
                class="button{% if page_data['PreviousDay'] is none %} disabled{% endif %}">
                 Previous Day

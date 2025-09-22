@@ -10,7 +10,7 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from sc_utility import DateHelper, SCConfigManager, SCLogger
+from sc_utility import DateHelper, JSONEncoder, SCConfigManager, SCLogger
 
 
 class PowerControllerViewer:
@@ -53,7 +53,13 @@ class PowerControllerViewer:
 
                 try:
                     state_item = self._safe_read_json(file_path)
+
                     if state_item is not None:
+                        # Decode any datatype hints if it's a PowerController state file
+                        if state_item.get("StateFileType") == "PowerController":
+                            state_item = JSONEncoder.decode_object(state_item)
+                            assert isinstance(state_item, dict), "Decoded data is not a dictionary."
+
                         self.state_items.append(state_item)
                         self.logger.log_message(f"Successfully loaded state item {idx + 1} from {file_path}.", "debug")
 
@@ -123,6 +129,8 @@ class PowerControllerViewer:
         state_type = self.get_state(state_idx, "StateFileType", default="AmberPowerController")
         if state_type == "AmberPowerController":
             max_day_idx = len(self.get_state(state_idx, "DailyData", default=[])) - 1
+        elif state_type == "PowerController":
+            max_day_idx = len(self.get_state(state_idx, "Output", "RunHistory", "DailyData", default=[])) - 1
         elif state_type == "LightingControl":
             max_day_idx = len(self.get_state(state_idx, "SwitchEvents", default=[])) - 1
         else:
@@ -232,6 +240,7 @@ class PowerControllerViewer:
         """
         state_file_path = Path(__file__).resolve().parent / "state_data" / (state_item["DeviceName"] + ".json")
         try:
+            # TO DO: Decode the datatype and enum hints using json_encoder
             self._safe_write_json(state_file_path, state_item)
             self.logger.log_message(f"Successfully saved state to {state_file_path}.", "debug")
         except OSError as e:

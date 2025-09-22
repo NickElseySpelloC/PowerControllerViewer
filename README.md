@@ -1,5 +1,5 @@
 # PowerControllerViewer Web Interface
-The simple Python web app is used to display current status and recent history from one or more AmberPowerController and/or LightingControl installations. Before using this app, please install and run at least one instance of the one of these apps, available here
+The simple Python web app is used to display current status and recent history from one or more PowerController, AmberPowerController (lagecy) and/or LightingControl installations. Before using this app, please install and run at least one instance of the one of these apps, available here
 
 https://github.com/NickElseySpelloC/
 
@@ -70,7 +70,7 @@ Use the shell script to run the web app. This uses UV to create the virtual envi
 Go to http://192.168.1.20:8000/home to view the web page. You should see something like this:
 ![No State Data Available](images/no_state_data.png)
 
-Now go edit the _config.yaml_ config file for the AmberPowerController or LightingControl app. In the _Website_ section, enter the details of this web app:
+Now go edit the _config.yaml_ config file for the PowerController, AmberPowerController or LightingControl app. In the section for the viewer website, enter the details of this web app:
 ```
   WebsiteBaseURL: http://192.168.1.20:8000
   WebsiteAccessKey: <Optional access key>
