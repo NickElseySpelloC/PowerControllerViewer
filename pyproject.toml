@@ -1,7 +1,7 @@
 [project]
 name = "PowerControllerViewer"
 version = "0.1.0"
-description = "View the status of one or more AmberPowerController or LightingControl application instances"
+description = "View the status of one or more PowerController or LightingControl application instances"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -12,7 +12,7 @@ dependencies = [
     "python-dateutil>=2.9.0.post0",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",
-    "sc-utility>=2.3.2",
+    "sc-utility>=2.3.4",
     "wheel>=0.45.1",
 ]
 
