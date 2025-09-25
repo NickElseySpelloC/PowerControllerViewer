@@ -247,6 +247,17 @@ def build_amberpower_homepage(state_idx: int, state_next_idx: int | None, debug_
         average_daily_usage = ((helper.get_state(state_idx, "EnergyUsed", default=0) - helper.get_state(state_idx, "DailyData", 0, "EnergyUsed", default=0)) / 7) / 1000
         average_price = helper.get_state(state_idx, "AveragePrice", default=0)
 
+        # Build run plan
+        run_plan = helper.get_state(state_idx, "TodayRunPlan", default=[])
+        # Add a Duration key to each event in the run plan
+        for event in run_plan:
+            try:
+                start_time = dt.time.fromisoformat(event.get("From"))
+                end_time = dt.time.fromisoformat(event.get("To"))
+                event["Duration"] = helper.hours_to_string((dt.datetime.combine(dt.date.min, end_time) - dt.datetime.combine(dt.date.min, start_time)).seconds / 3600)
+            except (ValueError, TypeError):
+                event["Duration"] = "Unknown"
+
         # Build a dict object that we will use to pass the information to the web page
         summary_page_data = {
             "AccessKey": config.get("Website", "AccessKey"),
@@ -268,7 +279,7 @@ def build_amberpower_homepage(state_idx: int, state_next_idx: int | None, debug_
             "AverageDailyUsage": round(average_daily_usage, 2),
             "AverageDailyCost": f"${average_daily_usage * average_price / 100:.2f}",
             "HaveRunPlan": len(helper.get_state(state_idx, "TodayRunPlan", default=[])) > 0,
-            "RunPlan": helper.get_state(state_idx, "TodayRunPlan", default=[]),
+            "RunPlan": run_plan,
             "ForecastPrice": round(helper.get_state(state_idx, "AverageForecastPrice", default=0), 1),
             "DebugMessage": debug_message,
             }
@@ -324,6 +335,7 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
                 entry = {
                     "From": event.get("StartTime").strftime("%H:%M") if isinstance(event.get("StartTime"), dt.time) else "Unknown",
                     "To": event.get("EndTime").strftime("%H:%M") if isinstance(event.get("EndTime"), dt.time) else "Unknown",
+                    "Duration": helper.hours_to_string(event.get("Minutes", 0) / 60),
                     "AveragePrice": "Unknown" if event.get("Price") is None else f"{round(event.get('Price'), 1)}",
                 }
                 run_plan_summary.append(entry)
@@ -342,7 +354,7 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
             "IsDeviceRunning": output_data.get("IsOn", False),
             "PumpStatus": "Not running" if not output_data.get("IsOn", False) else "Started at " + (pump_start_time.strftime("%H:%M:%S") if pump_start_time else "Unknown"),
             "RemaningRuntime": helper.hours_to_string(run_plan.get("PlannedHours", 0)),
-            "AverageDailyRuntime": run_history.get("AlltimeTotals", {}).get("ActualHoursPerDay", 0),
+            "AverageDailyRuntime": helper.hours_to_string(run_history.get("CurrentTotals", {}).get("ActualHoursPerDay", 0)),
             "LivePrices": output_data.get("DeviceMode") == "BestPrice",
             "CurrentPrice": round(run_history.get("CurrentPrice", 0), 1),
             "AverageEnergyPrice": round(average_price, 1),
@@ -572,16 +584,22 @@ def build_amberpower_daily_data(state_idx: int, day: int, max_day: int) -> dict:
         # Build the device_runs array
         device_runs = []
         for run in day_data["DeviceRuns"]:
-            start_time = DateHelper.parse_date(run["StartTime"], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")  # type: ignore[call-arg]
+            start_time = DateHelper.parse_date(run["StartTime"], "%Y-%m-%d %H:%M:%S")  # type: ignore[call-arg]
+            start_time_str = start_time.strftime("%H:%M")  # type: ignore[call-arg]
             if run["EndTime"] is None:
-                end_time = "Running"
+                end_time = None
+                end_time_str = "Running"
+                duration_str = ""
             else:
-                end_time = DateHelper.parse_date(run["EndTime"], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")  # type: ignore[call-arg]
+                end_time = DateHelper.parse_date(run["EndTime"], "%Y-%m-%d %H:%M:%S")  # type: ignore[call-arg]
+                end_time_str = end_time.strftime("%H:%M")  # type: ignore[call-arg]
+                duration_str = helper.hours_to_string((end_time - start_time).seconds / 3600)  # type: ignore[call-arg]
 
             price = "Unknown" if run["Price"] is None else f"{round(run['Price'], 1)} c/kWh"
             device_runs.append({
-                "Start": start_time,
-                "End": end_time,
+                "Start": start_time_str,
+                "End": end_time_str,
+                "Duration": duration_str,
                 "Price": price,
             })
 
@@ -669,13 +687,16 @@ def build_power_daily_data(state_idx: int, day: int, max_day: int) -> dict:  # n
             start_time = run.get("StartTime").strftime("%H:%M")
             if run.get("EndTime") is None:
                 end_time = "Running"
+                duration_str = ""
             else:
                 end_time = run.get("EndTime").strftime("%H:%M")
+                duration_str = helper.hours_to_string(run.get("ActualHours", 0))
 
             price = "Unknown" if run.get("AveragePrice") is None else f"{round(run.get('AveragePrice'), 1)} c/kWh"
             device_runs.append({
                 "Start": start_time,
                 "End": end_time,
+                "Duration": duration_str,
                 "Price": price,
             })
 
