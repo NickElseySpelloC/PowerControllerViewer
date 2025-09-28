@@ -331,10 +331,10 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
         # Build a summary of the run plan
         run_plan_summary = []
         for event in run_plan.get("RunPlan", []):
-            if event.get("StartTime") and event.get("EndTime"):
+            if event.get("StartDateTime") and event.get("EndDateTime"):
                 entry = {
-                    "From": event.get("StartTime").strftime("%H:%M") if isinstance(event.get("StartTime"), dt.time) else "Unknown",
-                    "To": event.get("EndTime").strftime("%H:%M") if isinstance(event.get("EndTime"), dt.time) else "Unknown",
+                    "From": event.get("StartDateTime").strftime("%H:%M") if isinstance(event.get("StartDateTime"), dt.datetime) else "Unknown",
+                    "To": event.get("EndDateTime").strftime("%H:%M") if isinstance(event.get("EndDateTime"), dt.datetime) else "Unknown",
                     "Duration": helper.hours_to_string(event.get("Minutes", 0) / 60),
                     "AveragePrice": "Unknown" if event.get("Price") is None else f"{round(event.get('Price'), 1)}",
                 }
