@@ -59,7 +59,9 @@
                     </td>
                 </tr>
                 <tr>
-                    <td>Remaning Runtime Today</td><td>{{ page_data['RemaningRuntime'] }} hours</td>
+                    <td>Runtime Today</td><td>Target: {{ page_data['TargetRuntime'] }}hrs<br>
+                        Actual: {{ page_data['ActualRuntime'] }} hrs<br>
+                        Remaining: {{ page_data['RemainingRuntime'] }} hrs</td>
                 </tr>
                 <tr>
                     <td>Average Daily Runtime</td><td>{{ page_data['AverageDailyRuntime'] }} hours</td>
@@ -75,10 +77,7 @@
                     <td>Average Energy Price</td><td>{{ page_data['AverageEnergyPrice'] }} c/kWh</td>
                 </tr>
                 <tr>
-                    <td>Average Daily Usage</td><td>{{ page_data['AverageDailyUsage'] }} kWh</td>
-                </tr>
-                <tr>
-                    <td>Average Daily Cost</td><td>{{ page_data['AverageDailyCost'] }}</td>
+                    <td>Average Daily Usage</td><td>{{ page_data['AverageDailyUsage'] }} kWh&nbsp;&nbsp;{{ page_data['AverageDailyCost'] }}</td>
                 </tr>
                 {% if page_data['HaveRunPlan'] %}
                 <tr>

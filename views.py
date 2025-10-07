@@ -81,6 +81,8 @@ def home():  # noqa: PLR0912, PLR0915
     # Now loop through the state_items and build the home page data
     for state_idx, _ in enumerate(helper.state_items):
         state_file_type = helper.get_state(state_idx, "StateFileType", default="AmberPowerController")
+        device_description = "Unknown"
+        last_save_time = DateHelper.now()
         if state_file_type == "AmberPowerController":
             last_save_time = DateHelper.parse_date(helper.get_state(state_idx, "LastStateSaveTime", default=DateHelper.now_str()), "%Y-%m-%d %H:%M:%S")
             if helper.get_state(state_idx, "DeviceType", default="PoolPump") == "PoolPump" or helper.get_state(state_idx, "DeviceType") == "HotWaterSystem":
@@ -126,7 +128,7 @@ def home():  # noqa: PLR0912, PLR0915
         if state_file_type == "PowerController":
             # Device is running if any light is on
             device["IsDeviceRunning"] = helper.get_state(state_idx, "Output", "IsOn", default=False)
-            remaining_runtime = helper.hours_to_string(helper.get_state(state_idx, "Output", "RunPlan", "PlannedHours", default=0))
+            remaining_runtime = helper.hours_to_string(helper.get_state(state_idx, "Output", "RunPlan", "RemainingHours", default=0))
             pump_start_time = None
             if device["IsDeviceRunning"]:
                 pump_start_time = helper.get_state(state_idx, "Output", "RunHistory", "LastStartTime", default=None)
@@ -271,7 +273,9 @@ def build_amberpower_homepage(state_idx: int, state_next_idx: int | None, debug_
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
             "IsDeviceRunning": helper.get_state(state_idx, "IsDeviceRunning", default=False),
             "PumpStatus": "Not running" if not helper.get_state(state_idx, "IsDeviceRunning", default=False) else "Started at " + (pump_start_time.strftime("%H:%M:%S") if pump_start_time else "Unknown"),
-            "RemaningRuntime": helper.hours_to_string(helper.get_state(state_idx, "DailyData", 0, "RemainingRuntimeToday", default=0)),
+            "TargetRuntime": helper.hours_to_string(helper.get_state(state_idx, "DailyData", 0, "TargetRuntime", default=0)),
+            "ActualRuntime": helper.hours_to_string(helper.get_state(state_idx, "DailyData", 0, "RuntimeToday", default=0)),
+            "RemainingRuntime": helper.hours_to_string(helper.get_state(state_idx, "DailyData", 0, "RemainingRuntimeToday", default=0)),
             "AverageDailyRuntime": helper.hours_to_string(helper.get_state(state_idx, "AverageRuntimePriorDays", default=0)),
             "LivePrices": helper.get_state(state_idx, "LivePrices", default=True),
             "CurrentPrice": round(helper.get_state(state_idx, "CurrentPrice"), 1),
@@ -290,7 +294,7 @@ def build_amberpower_homepage(state_idx: int, state_next_idx: int | None, debug_
         return summary_page_data
 
 
-def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_message: str | None = None):
+def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_message: str | None = None):  # noqa: PLR0914
     """Build the homepage for a PowerController state file.
 
     Args:
@@ -322,11 +326,20 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
         last_save_time = state_data.get("LastSave", DateHelper.now())
         logger.log_message(f"Home: rendering device {state_data.get('DeviceName')} of type PowerController for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]
 
+        pump_start_time = None
         if output_data.get("IsOn"):
             pump_start_time = run_history.get("LastStartTime")
         average_hourly_usage = (run_history.get("AlltimeTotals", {}).get("HourlyEnergyUsed") or 0) / 1000
         average_daily_usage = average_hourly_usage * 24
         average_price = run_history.get("AlltimeTotals", {}).get("AveragePrice") or 0
+
+        run_history_days = run_history.get("DailyData", [])
+        actual_hours = 0
+        target_hours = 0
+        if run_history_days:
+            run_history_today = run_history_days[-1]
+            actual_hours = run_history_today["ActualHours"]
+            target_hours = run_history_today["TargetHours"]
 
         # Build a summary of the run plan
         run_plan_summary = []
@@ -353,7 +366,9 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
             "IsDeviceRunning": output_data.get("IsOn", False),
             "PumpStatus": "Not running" if not output_data.get("IsOn", False) else "Started at " + (pump_start_time.strftime("%H:%M:%S") if pump_start_time else "Unknown"),
-            "RemaningRuntime": helper.hours_to_string(run_plan.get("PlannedHours", 0)),
+            "TargetRuntime": "All" if target_hours is None else helper.hours_to_string(target_hours),
+            "ActualRuntime": helper.hours_to_string(actual_hours),
+            "RemainingRuntime": helper.hours_to_string(run_plan.get("RemainingHours", 0)),
             "AverageDailyRuntime": helper.hours_to_string(run_history.get("CurrentTotals", {}).get("ActualHoursPerDay", 0)),
             "LivePrices": output_data.get("DeviceMode") == "BestPrice",
             "CurrentPrice": round(run_history.get("CurrentPrice", 0), 1),
@@ -652,8 +667,8 @@ def build_power_daily_data(state_idx: int, day: int, max_day: int) -> dict:  # n
 
         page_date = day_data.get("Date")
         actual_runtime = helper.hours_to_string(day_data.get("ActualHours", 0) or 0) + " hours run"
-        if (run_plan.get("PlannedHours", 0) or 0) > 0:
-            actual_runtime += ", " + helper.hours_to_string(run_plan.get("PlannedHours", 0) or 0) + " hours remaining"
+        if (run_plan.get("RemainingHours", 0) or 0) > 0:
+            actual_runtime += ", " + helper.hours_to_string(run_plan.get("RemainingHours", 0) or 0) + " hours remaining"
 
         energy_usage = f"{(day_data.get('EnergyUsed', 0) or 0) / 1000:.2f} kWh"
         average_price = day_data.get("AveragePrice", 0) or 0
