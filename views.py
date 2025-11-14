@@ -317,11 +317,11 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
     try:
         state_data = helper.state_items[state_idx]
         assert isinstance(state_data, dict)
-        output_data = state_data.get("Output", {})
+        output_data = state_data.get("Output", {}) or {}
         assert isinstance(output_data, dict)
-        run_plan = output_data.get("RunPlan", {})
+        run_plan = output_data.get("RunPlan", []) or {}
         assert isinstance(run_plan, dict)
-        run_history = output_data.get("RunHistory", {})
+        run_history = output_data.get("RunHistory", {}) or {}
         assert isinstance(run_history, dict)
         last_save_time = state_data.get("LastSave", DateHelper.now())
         logger.log_message(f"Home: rendering device {state_data.get('DeviceName')} of type PowerController for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]
@@ -343,15 +343,17 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
 
         # Build a summary of the run plan
         run_plan_summary = []
-        for event in run_plan.get("RunPlan", []):
-            if event.get("StartDateTime") and event.get("EndDateTime"):
-                entry = {
-                    "From": event.get("StartDateTime").strftime("%H:%M") if isinstance(event.get("StartDateTime"), dt.datetime) else "Unknown",
-                    "To": event.get("EndDateTime").strftime("%H:%M") if isinstance(event.get("EndDateTime"), dt.datetime) else "Unknown",
-                    "Duration": helper.hours_to_string(event.get("Minutes", 0) / 60),
-                    "AveragePrice": "Unknown" if event.get("Price") is None else f"{round(event.get('Price'), 1)}",
-                }
-                run_plan_summary.append(entry)
+        if run_plan:
+            run_plan_entries = run_plan.get("RunPlan", []) or []
+            for event in run_plan_entries:
+                if event.get("StartDateTime") and event.get("EndDateTime"):
+                    entry = {
+                        "From": event.get("StartDateTime").strftime("%H:%M") if isinstance(event.get("StartDateTime"), dt.datetime) else "Unknown",
+                        "To": event.get("EndDateTime").strftime("%H:%M") if isinstance(event.get("EndDateTime"), dt.datetime) else "Unknown",
+                        "Duration": helper.hours_to_string(event.get("Minutes", 0) / 60),
+                        "AveragePrice": "Unknown" if event.get("Price") is None else f"{round(event.get('Price'), 1)}",
+                    }
+                    run_plan_summary.append(entry)
 
         # Build a dict object that we will use to pass the information to the web page
         summary_page_data = {
@@ -652,11 +654,11 @@ def build_power_daily_data(state_idx: int, day: int, max_day: int) -> dict:  # n
         # Build the dict object that we will use to pass the information to the web page
         state_data = helper.state_items[state_idx]
         assert isinstance(state_data, dict)
-        output_data = state_data.get("Output", {})
+        output_data = state_data.get("Output", {}) or {}
         assert isinstance(output_data, dict)
-        run_plan = output_data.get("RunPlan", {})
+        run_plan = output_data.get("RunPlan", {}) or {}
         assert isinstance(run_plan, dict)
-        run_history = output_data.get("RunHistory", {})
+        run_history = output_data.get("RunHistory", {}) or {}
         assert isinstance(run_history, dict)
 
         # We want to page throught the events in reverse order. Make a deep copy of the DailyData list and reverse sort by Date
