@@ -4,16 +4,19 @@ version = "0.1.0"
 description = "View the status of one or more PowerController or LightingControl application instances"
 readme = "README.md"
 requires-python = ">=3.13"
+service_name="PowerControllerViewer"
+launch_path="src/main.py"
 dependencies = [
     "cerberus>=1.3.7",
     "flask>=3.1.0",
     "gunicorn>=23.0.0",
+    "matplotlib>=3.10.7",
     "org-enums",
     "pre-commit>=4.3.0",
     "python-dateutil>=2.9.0.post0",
     "pyyaml>=6.0.2",
     "requests>=2.32.3",
-    "sc-utility>=2.3.4",
+    "sc-utility>=2.4.5",
     "wheel>=0.45.1",
 ]
 

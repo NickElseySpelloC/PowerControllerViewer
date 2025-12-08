@@ -92,3 +92,86 @@ table table th, table table td {
 .black-circle {
     background-color: #000000;
 }
+
+.info_table {
+    border: none;
+    width: 100%;
+    text-align: center;
+}
+
+/* Table element styles for the desktop temp probe display */
+
+.info_td {
+    vertical-align: middle;
+    text-align: center;
+    border: none;
+}
+
+.info_text_name {
+    font-size: clamp(1rem, 2.5vw, 6rem);
+    text-align: center;
+}
+
+.info_text_time {
+    font-size: clamp(0.7rem, 0.9vw, 1.2rem);
+}
+
+.info_text_temp {
+    font-size: clamp(1.0rem, 7.0vw, 16.0rem);
+    text-align: center;
+}
+
+.info_text_temp_unit {
+    vertical-align: top;
+    font-size: clamp(1.0rem, 2.0vw, 4.0rem);
+}
+
+.info_text_temp_na {
+    font-size: clamp(1.0rem, 3.5vw, 8rem);
+}
+
+.info_td_chart {
+    vertical-align: middle;
+    text-align: center;
+    border: none;
+}
+
+.temp_probe_chart {
+    margin-top: 25px; 
+    width: 80%;
+    height: auto;
+    /* max-height: 400px; */
+    object-fit: contain;
+}
+
+/* Table element styles for the mobile temp probe display */
+.info_td_mobile {
+    vertical-align: middle;
+    text-align: left;
+    border: none;
+}
+
+
+/* Mobile-specific adjustments */
+@media (max-width: 480px) {
+  /* Hide the full table on mobile */
+  .info_table.full {
+    display: none;
+  }
+
+  /* Show compact table on mobile */
+  .info_table.compact {
+    display: table;
+  }
+}
+
+/* Hide compact table on desktop */
+@media (min-width: 481px) {
+  .info_table.compact {
+    display: none;
+  }
+  
+  .info_table.full {
+    display: table;
+  }
+}

@@ -10,7 +10,9 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
-from sc_utility import DateHelper, JSONEncoder, SCConfigManager, SCLogger
+from sc_utility import DateHelper, JSONEncoder, SCCommon, SCConfigManager, SCLogger
+
+TEMP_PROBE_CHART_LOCATION = "static/dummy_chart.jpg"
 
 
 class PowerControllerViewer:
@@ -22,6 +24,9 @@ class PowerControllerViewer:
         self.last_housekeeping = None
         self.last_state_check = None
         self.last_state_filename_hash = None
+        state_file_path = SCCommon.select_file_location("state_data/test.json")
+        self.state_data_dir = state_file_path.parent  # pyright: ignore[reportOptionalMemberAccess]
+
         self.state_items = []   # List of state items loaded from JSON files
         self.config_last_check = DateHelper.now()
         # Perform initial housekeeping which will include loading the state files
@@ -30,24 +35,23 @@ class PowerControllerViewer:
     def load_state_files(self):
         """Load the availabke state from the JSON files."""
         # Look in the state_data subdirectory for the all the available state files
-        state_data_dir = Path(__file__).resolve().parent / "state_data"
 
         # Initialize the state list
         self.state_items.clear()
 
-        if state_data_dir.exists() and state_data_dir.is_dir():
-            json_files = sorted([f.name for f in state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")])
+        if self.state_data_dir.exists() and self.state_data_dir.is_dir():
+            json_files = sorted([f.name for f in self.state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")])
 
             # Show a warning if we have no state data
             if not json_files:
-                self.logger.log_message(f"No JSON files found in {state_data_dir}.", "warning")
+                self.logger.log_message(f"No JSON files found in {self.state_data_dir}.", "warning")
 
             for idx, file_name in enumerate(json_files):
                 if file_name.startswith("."):
                     # Skip hidden files
                     continue
 
-                file_path = Path(state_data_dir) / file_name
+                file_path = Path(self.state_data_dir) / file_name
 
                 self.logger.log_message(f"Attempting to load state file: {file_path}.", "debug")
 
@@ -56,7 +60,7 @@ class PowerControllerViewer:
 
                     if state_item is not None:
                         # Decode any datatype hints if it's a PowerController state file
-                        if state_item.get("StateFileType") == "PowerController":
+                        if state_item.get("StateFileType") in {"PowerController", "TempProbes"}:
                             state_item = JSONEncoder.decode_object(state_item)
                             assert isinstance(state_item, dict), "Decoded data is not a dictionary."
 
@@ -126,10 +130,8 @@ class PowerControllerViewer:
             return None, None, None
 
         # Validate state type and count how many day entries we have
-        state_type = self.get_state(state_idx, "StateFileType", default="AmberPowerController")
-        if state_type == "AmberPowerController":
-            max_day_idx = len(self.get_state(state_idx, "DailyData", default=[])) - 1
-        elif state_type == "PowerController":
+        state_type = self.get_state(state_idx, "StateFileType", default="PowerController")
+        if state_type == "PowerController":
             max_day_idx = len(self.get_state(state_idx, "Output", "RunHistory", "DailyData", default=[])) - 1
         elif state_type == "LightingControl":
             max_day_idx = len(self.get_state(state_idx, "SwitchEvents", default=[])) - 1
@@ -156,79 +158,6 @@ class PowerControllerViewer:
 
         return state_idx, day_idx, max_day_idx
 
-    def _safe_read_json(self, file_path: Path, max_retries: int = 3, retry_delay: float = 0.1):
-        """Safely read JSON file with locking and retries.
-
-        Args:
-            file_path (Path): The path to the JSON file to read.
-            max_retries (int): Maximum number of retries for reading the file.
-            retry_delay (float): Delay in seconds between retries.
-
-        Raises:
-            OSError: If the file cannot be read after the maximum number of retries.
-            json.JSONDecodeError: If the file is not a valid JSON.
-
-        Returns:
-            dict | None: The parsed JSON data if successful, None if the file is empty or unreadable.
-        """
-        for attempt in range(max_retries):
-            try:
-                with file_path.open("r", encoding="utf-8") as file:
-                    fcntl.flock(file.fileno(), fcntl.LOCK_SH)
-                    try:
-                        file.seek(0, 2)  # Seek to end
-                        if file.tell() == 0:
-                            self.logger.log_message(f"File {file_path} is empty, skipping.", "warning")
-                            return None
-                        file.seek(0)  # Reset to beginning
-                        return json.load(file)
-                    finally:
-                        fcntl.flock(file.fileno(), fcntl.LOCK_UN)
-            except (OSError, json.JSONDecodeError) as e:
-                if attempt < max_retries - 1:
-                    self.logger.log_message(f"Read failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying...", "warning")
-                    time.sleep(retry_delay)
-                    continue
-                raise
-        return None
-
-    def _safe_write_json(self, file_path: Path, data: dict, max_retries: int = 3, retry_delay: float = 0.1):
-        """Safely write JSON file with atomic operations and locking.
-
-        Args:
-            file_path (Path): The path to the JSON file to write.
-            data (dict): The data to write to the JSON file.
-            max_retries (int): Maximum number of retries for writing the file.
-            retry_delay (float): Delay in seconds between retries.
-
-        Raises:
-            OSError: If the file cannot be written after the maximum number of retries.
-
-        Returns:
-            bool: True if the write was successful, False if the file was empty or unreadable
-        """
-        for attempt in range(max_retries):
-            try:
-                temp_file_path = file_path.with_suffix(".tmp")
-                with temp_file_path.open("w", encoding="utf-8") as file:
-                    fcntl.flock(file.fileno(), fcntl.LOCK_EX)
-                    try:
-                        json.dump(data, file, indent=4)
-                        file.flush()
-                    finally:
-                        fcntl.flock(file.fileno(), fcntl.LOCK_UN)
-
-                temp_file_path.replace(file_path)
-            except OSError as e:
-                if attempt < max_retries - 1:
-                    self.logger.log_message(f"Write failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying...", "warning")
-                    time.sleep(retry_delay)
-                    continue
-                raise
-            else:
-                return True
-        return False
-
     def save_state(self, state_item: dict):
         """Save the current state to the JSON file. This assumes that the calling function has already validates the state file.
 
@@ -238,13 +167,13 @@ class PowerControllerViewer:
         Returns:
             bool: True if the state was saved successfully, False if the file was empty or unreadable.
         """
-        state_file_path = Path(__file__).resolve().parent / "state_data" / (state_item["DeviceName"] + ".json")
         try:
             # TO DO: Decode the datatype and enum hints using json_encoder
-            self._safe_write_json(state_file_path, state_item)
-            self.logger.log_message(f"Successfully saved state to {state_file_path}.", "debug")
-        except OSError as e:
-            self.report_fatal_error(f"Error writing to {state_file_path}: {e}")
+            file_path = Path(self.state_data_dir) / f"{state_item['DeviceName']}.json"
+            self._safe_write_json(file_path, state_item)  # pyright: ignore[reportArgumentType]
+            self.logger.log_message(f"Successfully saved state to {self.state_data_dir}.", "debug")
+        except (RuntimeError, OSError) as e:
+            self.report_fatal_error(f"Error writing to {self.state_data_dir}: {e}")
         else:
             return True
 
@@ -259,11 +188,9 @@ class PowerControllerViewer:
 
         # Get the last modified time of the state files
         # Look in the state_data subdirectory for the all the available state files
-        state_data_dir = Path(__file__).resolve().parent / "state_data"
-
         filename_concat = ""
-        if state_data_dir.exists() and state_data_dir.is_dir():
-            json_files = [f for f in state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")]
+        if self.state_data_dir.exists() and self.state_data_dir.is_dir():
+            json_files = [f for f in self.state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")]
 
             for file_path in json_files:
                 # This will be the concatentnation of all the state file names - used to check if files have been added or removed
@@ -279,7 +206,7 @@ class PowerControllerViewer:
                     return True
 
             if self.last_state_filename_hash != filename_concat:
-                self.logger.log_message(f"State files have changed. Reloading state files from {state_data_dir}.", "debug")
+                self.logger.log_message(f"State files have changed. Reloading state files from {self.state_data_dir}.", "debug")
                 self.last_state_filename_hash = filename_concat
                 return True
 
@@ -494,6 +421,98 @@ class PowerControllerViewer:
             if value is None and default is not None:
                 return default
             return value
+
+    def generate_temp_probe_chart(self, probe_data: list[dict]) -> str | None:
+        """Generate a temperature probe chart from the provided probe data.
+
+        Args:
+            probe_data (list[dict]): List of temperature probe data dictionaries.
+
+        Returns:
+            str | None: The name of the generated chart image in the static folder, or None if generation failed.
+        """
+        # TO DO: Implement the chart generation logic
+        self.logger.log_message("Generating temperature probe chart... (not yet implemented)", "debug")
+
+        chart_path = SCCommon.select_file_location(TEMP_PROBE_CHART_LOCATION)
+        if chart_path is None:
+            self.logger.log_message("Failed to determine chart path.", "error")
+            return None
+        return chart_path.name
+
+    # ============ PRIVATE FUNCTIONS ========================================================================
+    def _safe_read_json(self, file_path: Path, max_retries: int = 3, retry_delay: float = 0.1):
+        """Safely read JSON file with locking and retries.
+
+        Args:
+            file_path (Path): The path to the JSON file to read.
+            max_retries (int): Maximum number of retries for reading the file.
+            retry_delay (float): Delay in seconds between retries.
+
+        Raises:
+            OSError: If the file cannot be read after the maximum number of retries.
+            json.JSONDecodeError: If the file is not a valid JSON.
+
+        Returns:
+            dict | None: The parsed JSON data if successful, None if the file is empty or unreadable.
+        """
+        for attempt in range(max_retries):
+            try:
+                with file_path.open("r", encoding="utf-8") as file:
+                    fcntl.flock(file.fileno(), fcntl.LOCK_SH)
+                    try:
+                        file.seek(0, 2)  # Seek to end
+                        if file.tell() == 0:
+                            self.logger.log_message(f"File {file_path} is empty, skipping.", "warning")
+                            return None
+                        file.seek(0)  # Reset to beginning
+                        return json.load(file)
+                    finally:
+                        fcntl.flock(file.fileno(), fcntl.LOCK_UN)
+            except (OSError, json.JSONDecodeError) as e:
+                if attempt < max_retries - 1:
+                    self.logger.log_message(f"Read failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying...", "warning")
+                    time.sleep(retry_delay)
+                    continue
+                raise
+        return None
+
+    def _safe_write_json(self, file_path: Path, data: dict, max_retries: int = 3, retry_delay: float = 0.1):
+        """Safely write JSON file with atomic operations and locking.
+
+        Args:
+            file_path (Path): The path to the JSON file to write.
+            data (dict): The data to write to the JSON file.
+            max_retries (int): Maximum number of retries for writing the file.
+            retry_delay (float): Delay in seconds between retries.
+
+        Raises:
+            OSError: If the file cannot be written after the maximum number of retries.
+
+        Returns:
+            bool: True if the write was successful, False if the file was empty or unreadable
+        """
+        for attempt in range(max_retries):
+            try:
+                temp_file_path = file_path.with_suffix(".tmp")
+                with temp_file_path.open("w", encoding="utf-8") as file:
+                    fcntl.flock(file.fileno(), fcntl.LOCK_EX)
+                    try:
+                        json.dump(data, file, indent=4)
+                        file.flush()
+                    finally:
+                        fcntl.flock(file.fileno(), fcntl.LOCK_UN)
+
+                temp_file_path.replace(file_path)
+            except OSError as e:
+                if attempt < max_retries - 1:
+                    self.logger.log_message(f"Write failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying...", "warning")
+                    time.sleep(retry_delay)
+                    continue
+                raise
+            else:
+                return True
+        return False
 
     def __setitem__(self, index, value):
         """Allows setting values in the state dictionary using square brackets."""

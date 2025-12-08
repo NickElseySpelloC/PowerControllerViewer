@@ -1,4 +1,5 @@
 """PowerControllerViewer web app based."""
+import signal
 import sys
 from pathlib import Path
 
@@ -19,7 +20,7 @@ helper = None
 # Initialize the Flask application
 # Import the views module
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="../templates", static_folder="../static")
 app.register_blueprint(views, url_prefix="/")
 
 
@@ -68,6 +69,41 @@ def favicon():
     return send_from_directory(str(Path(app.root_path) / "static"), "favicon.ico", mimetype="image/vnd.microsoft.icon")
 
 
+def _graceful_shutdown(sig: int, frame) -> None:  # noqa: ARG001
+    """Handle SIGINT/SIGTERM for clean shutdown."""
+    global logger, helper  # noqa: PLW0602
+    try:  # noqa: PLR1702
+        if logger is not None:
+            logger.log_message(f"Received signal {sig}. Shutting down gracefully...", "summary")
+        # Try common shutdown methods on helper
+        if helper is not None:
+            for method_name in ("shutdown", "stop", "shutdown_threads", "stop_threads", "close"):
+                if hasattr(helper, method_name):
+                    try:
+                        getattr(helper, method_name)()
+                        if logger is not None:
+                            logger.log_message(f"Invoked helper.{method_name}()", "detailed")
+                        break
+                    except Exception as e:  # noqa: BLE001
+                        if logger is not None:
+                            logger.log_message(f"Error during helper.{method_name}(): {e!s}", "detailed")
+        # Flush logs if supported
+    finally:
+        # Exit to stop Flask dev server loop cleanly
+        sys.exit(0)
+
+
+def _register_signal_handlers() -> None:
+    """Register SIGINT/SIGTERM handlers."""
+    try:
+        signal.signal(signal.SIGINT, _graceful_shutdown)
+        signal.signal(signal.SIGTERM, _graceful_shutdown)
+    except Exception:  # noqa: BLE001
+        # Some environments (e.g., threads or certain servers) may restrict signals
+        if logger is not None:
+            logger.log_message("Could not register signal handlers.", "detailed")
+
+
 def create_app():
     """Create and configure the Flask application.
 
@@ -106,6 +142,9 @@ def create_app():
     # Register the support functions with the views module
     register_support_classes(config, logger, helper)
 
+    # Register signal handlers for clean shutdown
+    _register_signal_handlers()
+
     return app
 
 
@@ -119,7 +158,11 @@ def main_loop():
     debug_mode = config.get("Website", "DebugMode", default=False) or False
 
     logger.log_message(f"Starting the PowerController web application on {hosting_ip}:{hosting_port}", "summary")
-    app.run(debug=debug_mode, host=hosting_ip, port=hosting_port)  # type: ignore[call-arg]
+    try:
+        app.run(debug=debug_mode, host=hosting_ip, port=hosting_port)  # type: ignore[call-arg]
+    except KeyboardInterrupt:
+        # Fallback if signals not registered or on dev server Ctrl-C
+        _graceful_shutdown(signal.SIGINT, None)
 
 
 # Initialize the app when the module is imported (for Gunicorn)

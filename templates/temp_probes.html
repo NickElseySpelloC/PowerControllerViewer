@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% if page_data['RefreshDelay'] > 0 %}
+        <meta http-equiv="refresh" content="{{page_data['RefreshDelay']}}">
+    {% endif %}
+    <title>{{page_data['DeviceName']}}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <div>        
+        <!-- List of temp probes. List each probe across the page -->
+        <div>
+            <!-- Table for full width display -->
+            <table class="info_table full">
+                <tbody>
+                    <tr>
+                        {% for device in page_data['TempProbes'] %}
+                            <td class="info_td"> 
+                                <span class="info_text_name">{{ device['Name'] }}</span>
+                                {% if device['HaveTemperature'] %}
+                                    <span class="info_text_time"> ({{ device['LastLoggedTime'] }})</span>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+
+                    <tr>
+                        {% for device in page_data['TempProbes'] %}
+                            {% if device['HaveTemperature'] %}
+                                <td class="info_td"> 
+                                    <span class="info_text_temp">{{ device['Temperature'] }}</span>
+                                    <span class="info_text_temp_unit">&nbsp;°C</span>
+                                </td>
+                            {% else %}
+                                <td class="info_td"> 
+                                    <span class="info_text_temp_na">N/A</span>
+                                </td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% if page_data['TempProbeChart'] %}
+                        <tr>
+                            <td class="info_td_chart" colspan="{{ page_data['TempProbes']|length }}">
+                                <img 
+                                    src="{{ url_for('static', filename=page_data['TempProbeChart']) }}" 
+                                    alt="Temperature Probe Chart" 
+                                    class="temp_probe_chart"
+                                >
+                            </td>
+                        </tr>
+                   {% endif %}
+                </tbody>
+            </table>
+
+            <!-- Table for mobile display -->
+            <table class="info_table compact">
+                <tbody>
+                    {% for device in page_data['TempProbes'] %}
+                        <tr>
+                            <td class="info_td_mobile"> 
+                                <span class="info_text_name">{{ device['Name'] }}</span>
+                                {% if device['HaveTemperature'] %}
+                                    <span class="info_text_time"> ({{ device['LastLoggedTime'] }})</span>
+                                {% endif %}
+                            </td>
+                            <td class="info_td_mobile"> 
+                                {% if device['HaveTemperature'] %}
+                                    <span class="info_text_temp">{{ device['Temperature'] }}</span>
+                                    <span class="info_text_temp_unit">&nbsp;°C</span>
+                                {% else %}
+                                    <span class="info_text_temp_na">N/A</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>            
+        </div>
+
+        
+    </div>
+    <script 
+        type="text/javascript" 
+        src="{{ url_for('static', filename='index.js') }}"
+    ></script>
+</body>
+</html>

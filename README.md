@@ -1,5 +1,5 @@
 # PowerControllerViewer Web Interface
-The simple Python web app is used to display current status and recent history from one or more PowerController, AmberPowerController (lagecy) and/or LightingControl installations. Before using this app, please install and run at least one instance of the one of these apps, available here
+The simple Python web app is used to display current status and recent history from one or more PowerController, and/or LightingControl installations. Before using this app, please install and run at least one instance of the one of these apps, available here
 
 https://github.com/NickElseySpelloC/
 
@@ -70,7 +70,7 @@ Use the shell script to run the web app. This uses UV to create the virtual envi
 Go to http://192.168.1.20:8000/home to view the web page. You should see something like this:
 ![No State Data Available](images/no_state_data.png)
 
-Now go edit the _config.yaml_ config file for the PowerController, AmberPowerController or LightingControl app. In the section for the viewer website, enter the details of this web app:
+Now go edit the _config.yaml_ config file for the PowerController or LightingControl app. In the section for the viewer website, enter the details of this web app:
 ```
   WebsiteBaseURL: http://192.168.1.20:8000
   WebsiteAccessKey: <Optional access key>
@@ -145,7 +145,7 @@ sudo apt install python3-pip python3-venv nginx
 ```bash
 cd /home/pi/scripts/PowerControllerViewer
 source .venv/bin/activate
-gunicorn --bind 192.168.1.20:8000 wsgi:app
+gunicorn --bind 192.168.1.20:8000 src/wsgi:app
 ```
 
 Visit http://192.168.1.20:8000/home to confirm it works. If you get an Access Denied message, add the Access Key that you specified in the config file, for example:
@@ -169,7 +169,7 @@ User=pi
 Group=www-data
 WorkingDirectory=/home/pi/scripts/PowerControllerViewer
 Environment="PATH=/home/pi/scripts/PowerControllerViewer/.venv/bin"
-ExecStart=/home/pi/scripts/PowerControllerViewer/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 wsgi:app
+ExecStart=/home/pi/scripts/PowerControllerViewer/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 src/wsgi:app
 
 [Install]
 WantedBy=multi-user.target
