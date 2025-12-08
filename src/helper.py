@@ -10,9 +10,16 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+import matplotlib as mpl
 from sc_utility import DateHelper, JSONEncoder, SCCommon, SCConfigManager, SCLogger
 
-TEMP_PROBE_CHART_LOCATION = "static/dummy_chart.jpg"
+mpl.use("Agg")  # Use non-interactive backend for server environments
+from collections import defaultdict
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+
+TEMP_PROBE_CHART_LOCATION = "static/temp_probes_chart.jpg"
 
 
 class PowerControllerViewer:
@@ -39,7 +46,15 @@ class PowerControllerViewer:
         # Initialize the state list
         self.state_items.clear()
 
-        if self.state_data_dir.exists() and self.state_data_dir.is_dir():
+        # Delete all existing temp probe charts
+        existing_charts = Path("static").glob("temp_probes_chart_*.jpg")
+        for chart_file in existing_charts:
+            try:
+                chart_file.unlink()
+            except OSError as e:
+                self.logger.log_message(f"Error deleting existing temp probe chart {chart_file}: {e}", "warning")
+
+        if self.state_data_dir.exists() and self.state_data_dir.is_dir():  # noqa: PLR1702
             json_files = sorted([f.name for f in self.state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")])
 
             # Show a warning if we have no state data
@@ -64,6 +79,22 @@ class PowerControllerViewer:
                             state_item = JSONEncoder.decode_object(state_item)
                             assert isinstance(state_item, dict), "Decoded data is not a dictionary."
 
+                        # If the state item is temp probe data, generate the temp probe charts now
+                        if state_item.get("StateFileType") == "TempProbes" and "TempProbeLogging" in state_item and state_item.get("Charting", {}).get("Enable"):
+                            charting_config = state_item.get("Charting", {}).get("Charts", []) or []
+                            probe_history = state_item.get("TempProbeLogging", {}).get("history", []) or []
+                            if probe_history:
+                                # Loop through the Charts in the charting config and generate a chart for each one
+                                state_item["TempProbeCharts"] = []
+                                for config_idx, chart_config in enumerate(charting_config):
+                                    chart_name = chart_config.get("Name", f"Chart{state_item.get('DeviceName', 'Unknown')}-{config_idx}")
+                                    chart_file_name = f"temp_probes_chart_{idx}-{config_idx}.jpg"
+                                    probe_names = chart_config.get("Probes", [])
+                                    days_to_show = chart_config.get("DaysToShow", 7)
+
+                                    if self.generate_temp_probe_chart(probe_history, chart_file_name, chart_name=chart_name, probe_names=probe_names, days_to_show=days_to_show):
+                                        state_item["TempProbeCharts"].append(chart_file_name)
+
                         self.state_items.append(state_item)
                         self.logger.log_message(f"Successfully loaded state item {idx + 1} from {file_path}.", "debug")
 
@@ -76,6 +107,8 @@ class PowerControllerViewer:
 
                 except (OSError, json.JSONDecodeError) as e:
                     self.report_fatal_error(f"Error loading JSON from {file_path}: {e}")
+
+            self.logger.log_message(f"Loaded {len(self.state_items)} state items from {self.state_data_dir}.", "debug")
 
     def validate_state_index(self, requested_state_idx: int | None = None) -> tuple[int | None, int | None]:
         """Validate that a requested state index is within the valid range.
@@ -422,23 +455,97 @@ class PowerControllerViewer:
                 return default
             return value
 
-    def generate_temp_probe_chart(self, probe_data: list[dict]) -> str | None:
+    def generate_temp_probe_chart(self, probe_data: list[dict], file_name: str, chart_name: str | None = None, probe_names: list[str] | None = None, days_to_show: int | None = None) -> bool:
         """Generate a temperature probe chart from the provided probe data.
 
         Args:
-            probe_data (list[dict]): List of temperature probe data dictionaries.
+            probe_data (list[dict]): List of temperature probe data dictionaries containing
+                                     'Timestamp', 'ProbeName', and 'Temperature' keys.
+            file_name (str): The file name to use for the generated chart image.
+            chart_name (str | None): Optional name for the chart.
+            probe_names (list[str] | None): Optional list of probe names to include in the chart. If None, all probes are included.
+            days_to_show (int | None): Optional number of days to show in the chart. If None, all data is shown.
 
         Returns:
-            str | None: The name of the generated chart image in the static folder, or None if generation failed.
+            bool: True if the chart was generated successfully, False otherwise.
         """
-        # TO DO: Implement the chart generation logic
-        self.logger.log_message("Generating temperature probe chart... (not yet implemented)", "debug")
+        if not probe_data:
+            self.logger.log_message("No probe data provided for chart generation.", "warning")
+            return False
 
-        chart_path = SCCommon.select_file_location(TEMP_PROBE_CHART_LOCATION)
-        if chart_path is None:
-            self.logger.log_message("Failed to determine chart path.", "error")
-            return None
-        return chart_path.name
+        try:
+            # Organize data by probe name
+            probe_series: dict[str, dict] = defaultdict(lambda: {"timestamps": [], "temperatures": []})
+            all_temps = []
+
+            earlist_time = None
+            if days_to_show is not None:
+                earlist_time = DateHelper.now() - dt.timedelta(days=days_to_show)
+
+            for entry in probe_data:
+                probe_name = entry.get("ProbeName")
+                timestamp = entry.get("Timestamp")
+                temperature = entry.get("Temperature")
+
+                if (probe_name  # noqa: PLR0916
+                    and (probe_name in probe_names or not probe_names)
+                    and timestamp and (not earlist_time or timestamp >= earlist_time)
+                    and temperature is not None):
+                    probe_series[probe_name]["timestamps"].append(timestamp)
+                    probe_series[probe_name]["temperatures"].append(temperature)
+                    all_temps.append(temperature)
+
+            if not all_temps:
+                self.logger.log_message("No valid temperature data found in probe_data.", "warning")
+                return False
+
+            # Calculate Y-axis range
+            min_temp = min(all_temps) - 2
+            max_temp = max(all_temps) + 2
+
+            # Create the plot
+            fig, ax = plt.subplots(figsize=(12, 4))
+
+            # Plot each probe's data
+            for probe_name, data in probe_series.items():
+                ax.plot(data["timestamps"], data["temperatures"],
+                       marker="o", linestyle="-", linewidth=2, markersize=4,
+                       label=probe_name)
+
+            # Configure axes
+            ax.set_xlabel("Date", fontsize=12)
+            ax.set_ylabel("Temperature °C", fontsize=12)
+            ax.set_ylim(min_temp, max_temp)
+            ax.grid(True, alpha=0.3)
+
+            # Format X-axis dates
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%d-%b"))
+            ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+            fig.autofmt_xdate()
+
+            # Add legend if we have more than one probe
+            if len(probe_series) > 1:
+                ax.legend(loc="best", framealpha=0.9)
+
+            # Add chart title
+            if chart_name:
+                ax.set_title(chart_name, fontsize=14)
+
+            # Save the chart
+            chart_path = SCCommon.select_file_location(f"static/{file_name}")
+            if chart_path is None:
+                self.logger.log_message("Failed to determine chart path.", "error")
+                return False
+
+            plt.tight_layout()
+            plt.savefig(chart_path, dpi=100, bbox_inches="tight")
+
+            plt.close(fig)
+
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as e:
+            self.logger.log_message(f"Error generating temperature probe chart: {e!s}", "error")
+            return False
+        return True
 
     # ============ PRIVATE FUNCTIONS ========================================================================
     def _safe_read_json(self, file_path: Path, max_retries: int = 3, retry_delay: float = 0.1):

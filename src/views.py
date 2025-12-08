@@ -409,8 +409,6 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
         assert isinstance(state_data, dict)
         probe_data = state_data.get("TempProbeLogging", {}).get("probes", []) or []
         assert isinstance(probe_data, list)
-        probe_history = state_data.get("TempProbeLogging", {}).get("history", []) or []
-        assert isinstance(probe_history, list)
         last_save_time = state_data.get("SaveTime", DateHelper.now())
         logger.log_message(f"Home: rendering device {state_data.get('DeviceName')} of type PowerController for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]
 
@@ -425,9 +423,6 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
             }
             temp_probe_summary.append(entry)
 
-        # Refresh the temp probe chart
-        probe_chart_name = helper.generate_temp_probe_chart(probe_history)
-
         # Build a dict object that we will use to pass the information to the web page
         summary_page_data = {
             "AccessKey": config.get("Website", "AccessKey"),
@@ -439,7 +434,7 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
             "DeviceName": state_data.get("DeviceName", "Unknown"),
             "DebugMessage": debug_message,
             "TempProbes": temp_probe_summary,
-            "TempProbeChart": probe_chart_name,
+            "TempProbeCharts": state_data.get("TempProbeCharts"),
             }
     except KeyError as e:
         error_message = f"An error occurred while rendering a TempProbes summary page: {e}"

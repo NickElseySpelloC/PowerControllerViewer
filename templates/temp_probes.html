@@ -42,18 +42,21 @@
                             {% endif %}
                         {% endfor %}
                     </tr>
-                    {% if page_data['TempProbeChart'] %}
-                        <tr>
-                            <td class="info_td_chart" colspan="{{ page_data['TempProbes']|length }}">
-                                <img 
-                                    src="{{ url_for('static', filename=page_data['TempProbeChart']) }}" 
-                                    alt="Temperature Probe Chart" 
-                                    class="temp_probe_chart"
-                                >
-                            </td>
-                        </tr>
-                   {% endif %}
-                </tbody>
+                    <!-- Display each temp probe chart (if any) -->
+                    {% if page_data['TempProbeCharts'] %}
+                        {% for chart in page_data['TempProbeCharts'] %}
+                            <tr>
+                                <td class="info_td_chart" colspan="{{ page_data['TempProbes']|length }}">
+                                    <img 
+                                        src="{{ url_for('static', filename=chart) }}" 
+                                        alt="Temperature Probe Chart" 
+                                        class="temp_probe_chart"
+                                    >
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% endif %}
+            </tbody>
             </table>
 
             <!-- Table for mobile display -->
