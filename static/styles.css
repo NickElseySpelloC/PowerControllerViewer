@@ -108,26 +108,92 @@ table table th, table table td {
 }
 
 .info_text_name {
+    font-size: 2.5vw; /* Fallback for older browsers */
     font-size: clamp(1rem, 2.5vw, 6rem);
     text-align: center;
 }
 
+/* For iOS 12 and older browsers, use media queries */
+@media (max-width: 480px) {
+    .info_text_name {
+        font-size: 1rem; /* Min on small screens */
+    }
+}
+
+@media (min-width: 2400px) {
+    .info_text_name {
+        font-size: 6rem; /* Max on very large screens */
+    }
+}
+
 .info_text_time {
+    font-size: 0.9vw;
     font-size: clamp(0.7rem, 0.9vw, 1.2rem);
 }
 
+@media (max-width: 480px) {
+    .info_text_time {
+        font-size: 0.7rem;
+    }
+}
+
+@media (min-width: 1333px) {
+    .info_text_time {
+        font-size: 1.2rem;
+    }
+}
+
 .info_text_temp {
+    font-size: 7.0vw;
     font-size: clamp(1.0rem, 7.0vw, 16.0rem);
     text-align: center;
 }
 
+@media (max-width: 480px) {
+    .info_text_temp {
+        font-size: 1.0rem;
+    }
+}
+
+@media (min-width: 2285px) {
+    .info_text_temp {
+        font-size: 16.0rem;
+    }
+}
+
 .info_text_temp_unit {
     vertical-align: top;
+    font-size: 2.0vw;
     font-size: clamp(1.0rem, 2.0vw, 4.0rem);
 }
 
+@media (max-width: 480px) {
+    .info_text_temp_unit {
+        font-size: 1.0rem;
+    }
+}
+
+@media (min-width: 2000px) {
+    .info_text_temp_unit {
+        font-size: 4.0rem;
+    }
+}
+
 .info_text_temp_na {
+    font-size: 3.5vw;
     font-size: clamp(1.0rem, 3.5vw, 8rem);
+}
+
+@media (max-width: 480px) {
+    .info_text_temp_na {
+        font-size: 1.0rem;
+    }
+}
+
+@media (min-width: 2285px) {
+    .info_text_temp_na {
+        font-size: 8rem;
+    }
 }
 
 .info_td_chart {

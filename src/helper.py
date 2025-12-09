@@ -46,15 +46,7 @@ class PowerControllerViewer:
         # Initialize the state list
         self.state_items.clear()
 
-        # Delete all existing temp probe charts
-        existing_charts = Path("static").glob("temp_probes_chart_*.jpg")
-        for chart_file in existing_charts:
-            try:
-                chart_file.unlink()
-            except OSError as e:
-                self.logger.log_message(f"Error deleting existing temp probe chart {chart_file}: {e}", "warning")
-
-        if self.state_data_dir.exists() and self.state_data_dir.is_dir():  # noqa: PLR1702
+        if self.state_data_dir.exists() and self.state_data_dir.is_dir():
             json_files = sorted([f.name for f in self.state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")])
 
             # Show a warning if we have no state data
@@ -79,21 +71,9 @@ class PowerControllerViewer:
                             state_item = JSONEncoder.decode_object(state_item)
                             assert isinstance(state_item, dict), "Decoded data is not a dictionary."
 
-                        # If the state item is temp probe data, generate the temp probe charts now
-                        if state_item.get("StateFileType") == "TempProbes" and "TempProbeLogging" in state_item and state_item.get("Charting", {}).get("Enable"):
-                            charting_config = state_item.get("Charting", {}).get("Charts", []) or []
-                            probe_history = state_item.get("TempProbeLogging", {}).get("history", []) or []
-                            if probe_history:
-                                # Loop through the Charts in the charting config and generate a chart for each one
-                                state_item["TempProbeCharts"] = []
-                                for config_idx, chart_config in enumerate(charting_config):
-                                    chart_name = chart_config.get("Name", f"Chart{state_item.get('DeviceName', 'Unknown')}-{config_idx}")
-                                    chart_file_name = f"temp_probes_chart_{idx}-{config_idx}.jpg"
-                                    probe_names = chart_config.get("Probes", [])
-                                    days_to_show = chart_config.get("DaysToShow", 7)
-
-                                    if self.generate_temp_probe_chart(probe_history, chart_file_name, chart_name=chart_name, probe_names=probe_names, days_to_show=days_to_show):
-                                        state_item["TempProbeCharts"].append(chart_file_name)
+                        if state_item.get("StateFileType") == "TempProbes":
+                            # Generate any required temp probe charts
+                            self._generate_state_data_charts(idx, state_item)
 
                         self.state_items.append(state_item)
                         self.logger.log_message(f"Successfully loaded state item {idx + 1} from {file_path}.", "debug")
@@ -455,7 +435,124 @@ class PowerControllerViewer:
                 return default
             return value
 
-    def generate_temp_probe_chart(self, probe_data: list[dict], file_name: str, chart_name: str | None = None, probe_names: list[str] | None = None, days_to_show: int | None = None) -> bool:
+    def _generate_state_data_charts(self, state_idx: int, state_item: dict):
+        """Generate any required state data charts.
+
+        Generates the required charts for the provided state item and saves them to the static directory.
+
+        Args:
+            state_idx (int): The index of the state item.
+            state_item (dict): The state item to generate charts for.
+        """
+        # Delete all existing temp probe charts for this state index
+        static_path = SCCommon.select_file_location("static/dummy.jpg")
+        state_name = state_item.get("DeviceName") or f"State {state_idx}"
+        if not static_path:
+            self.logger.log_message("Failed to determine static path for temp probe charts.", "error")
+            return
+        existing_charts = static_path.parent.glob(f"Chart_{state_name}*.jpg")
+        for chart_file in existing_charts:
+            try:
+                chart_file.unlink()
+            except OSError as e:
+                self.logger.log_message(f"Error deleting existing temp probe chart {chart_file}: {e}", "warning")
+
+        # If the state item is temp probe data, generate the temp probe charts now
+        probe_history = state_item.get("TempProbeLogging", {}).get("history", []) or []
+        if not probe_history or "TempProbeLogging" not in state_item or not state_item.get("Charting", {}).get("Enable"):
+            return
+
+        charting_config = state_item.get("Charting", {}).get("Charts", []) or []
+        # Loop through the Charts in the charting config and generate a chart for each one
+        state_item["TempProbeCharts"] = []
+        for config_idx, chart_config in enumerate(charting_config):
+            chart_name = chart_config.get("Name", f"Chart {state_name}-{config_idx}")
+            chart_file_name = f"Chart_{state_name}-{config_idx}.jpg"
+            probe_names = chart_config.get("Probes", [])
+            days_to_show = chart_config.get("DaysToShow", 7)
+
+            if self._generate_temp_probe_chart(probe_history, chart_file_name, chart_name=chart_name, probe_names=probe_names, days_to_show=days_to_show):
+                state_item["TempProbeCharts"].append(chart_file_name)
+
+    # ============ PRIVATE FUNCTIONS ========================================================================
+    def _safe_read_json(self, file_path: Path, max_retries: int = 3, retry_delay: float = 0.1):
+        """Safely read JSON file with locking and retries.
+
+        Args:
+            file_path (Path): The path to the JSON file to read.
+            max_retries (int): Maximum number of retries for reading the file.
+            retry_delay (float): Delay in seconds between retries.
+
+        Raises:
+            OSError: If the file cannot be read after the maximum number of retries.
+            json.JSONDecodeError: If the file is not a valid JSON.
+
+        Returns:
+            dict | None: The parsed JSON data if successful, None if the file is empty or unreadable.
+        """
+        for attempt in range(max_retries):
+            try:
+                with file_path.open("r", encoding="utf-8") as file:
+                    fcntl.flock(file.fileno(), fcntl.LOCK_SH)
+                    try:
+                        file.seek(0, 2)  # Seek to end
+                        if file.tell() == 0:
+                            self.logger.log_message(f"File {file_path} is empty, skipping.", "warning")
+                            return None
+                        file.seek(0)  # Reset to beginning
+                        return json.load(file)
+                    finally:
+                        fcntl.flock(file.fileno(), fcntl.LOCK_UN)
+            except (OSError, json.JSONDecodeError) as e:
+                if attempt < max_retries - 1:
+                    self.logger.log_message(f"Read failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying...", "warning")
+                    time.sleep(retry_delay)
+                    continue
+                raise
+        return None
+
+    def _safe_write_json(self, file_path: Path, data: dict, max_retries: int = 3, retry_delay: float = 0.1):
+        """Safely write JSON file with atomic operations and locking.
+
+        Args:
+            file_path (Path): The path to the JSON file to write.
+            data (dict): The data to write to the JSON file.
+            max_retries (int): Maximum number of retries for writing the file.
+            retry_delay (float): Delay in seconds between retries.
+
+        Raises:
+            OSError: If the file cannot be written after the maximum number of retries.
+
+        Returns:
+            bool: True if the write was successful, False if the file was empty or unreadable
+        """
+        for attempt in range(max_retries):
+            try:
+                temp_file_path = file_path.with_suffix(".tmp")
+                with temp_file_path.open("w", encoding="utf-8") as file:
+                    fcntl.flock(file.fileno(), fcntl.LOCK_EX)
+                    try:
+                        json.dump(data, file, indent=4)
+                        file.flush()
+                    finally:
+                        fcntl.flock(file.fileno(), fcntl.LOCK_UN)
+
+                temp_file_path.replace(file_path)
+            except OSError as e:
+                if attempt < max_retries - 1:
+                    self.logger.log_message(f"Write failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying...", "warning")
+                    time.sleep(retry_delay)
+                    continue
+                raise
+            else:
+                return True
+        return False
+
+    def __setitem__(self, index, value):
+        """Allows setting values in the state dictionary using square brackets."""
+        self.state_items[index] = value
+
+    def _generate_temp_probe_chart(self, probe_data: list[dict], file_name: str, chart_name: str | None = None, probe_names: list[str] | None = None, days_to_show: int | None = None) -> bool:
         """Generate a temperature probe chart from the provided probe data.
 
         Args:
@@ -537,6 +634,7 @@ class PowerControllerViewer:
                 self.logger.log_message("Failed to determine chart path.", "error")
                 return False
 
+            chart_path.unlink(missing_ok=True)  # Remove existing file if it exists
             plt.tight_layout()
             plt.savefig(chart_path, dpi=100, bbox_inches="tight")
 
@@ -546,81 +644,3 @@ class PowerControllerViewer:
             self.logger.log_message(f"Error generating temperature probe chart: {e!s}", "error")
             return False
         return True
-
-    # ============ PRIVATE FUNCTIONS ========================================================================
-    def _safe_read_json(self, file_path: Path, max_retries: int = 3, retry_delay: float = 0.1):
-        """Safely read JSON file with locking and retries.
-
-        Args:
-            file_path (Path): The path to the JSON file to read.
-            max_retries (int): Maximum number of retries for reading the file.
-            retry_delay (float): Delay in seconds between retries.
-
-        Raises:
-            OSError: If the file cannot be read after the maximum number of retries.
-            json.JSONDecodeError: If the file is not a valid JSON.
-
-        Returns:
-            dict | None: The parsed JSON data if successful, None if the file is empty or unreadable.
-        """
-        for attempt in range(max_retries):
-            try:
-                with file_path.open("r", encoding="utf-8") as file:
-                    fcntl.flock(file.fileno(), fcntl.LOCK_SH)
-                    try:
-                        file.seek(0, 2)  # Seek to end
-                        if file.tell() == 0:
-                            self.logger.log_message(f"File {file_path} is empty, skipping.", "warning")
-                            return None
-                        file.seek(0)  # Reset to beginning
-                        return json.load(file)
-                    finally:
-                        fcntl.flock(file.fileno(), fcntl.LOCK_UN)
-            except (OSError, json.JSONDecodeError) as e:
-                if attempt < max_retries - 1:
-                    self.logger.log_message(f"Read failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying...", "warning")
-                    time.sleep(retry_delay)
-                    continue
-                raise
-        return None
-
-    def _safe_write_json(self, file_path: Path, data: dict, max_retries: int = 3, retry_delay: float = 0.1):
-        """Safely write JSON file with atomic operations and locking.
-
-        Args:
-            file_path (Path): The path to the JSON file to write.
-            data (dict): The data to write to the JSON file.
-            max_retries (int): Maximum number of retries for writing the file.
-            retry_delay (float): Delay in seconds between retries.
-
-        Raises:
-            OSError: If the file cannot be written after the maximum number of retries.
-
-        Returns:
-            bool: True if the write was successful, False if the file was empty or unreadable
-        """
-        for attempt in range(max_retries):
-            try:
-                temp_file_path = file_path.with_suffix(".tmp")
-                with temp_file_path.open("w", encoding="utf-8") as file:
-                    fcntl.flock(file.fileno(), fcntl.LOCK_EX)
-                    try:
-                        json.dump(data, file, indent=4)
-                        file.flush()
-                    finally:
-                        fcntl.flock(file.fileno(), fcntl.LOCK_UN)
-
-                temp_file_path.replace(file_path)
-            except OSError as e:
-                if attempt < max_retries - 1:
-                    self.logger.log_message(f"Write failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying...", "warning")
-                    time.sleep(retry_delay)
-                    continue
-                raise
-            else:
-                return True
-        return False
-
-    def __setitem__(self, index, value):
-        """Allows setting values in the state dictionary using square brackets."""
-        self.state_items[index] = value
