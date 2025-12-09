@@ -4,6 +4,7 @@ import datetime as dt
 import fcntl
 import inspect
 import json
+import threading
 import time
 import traceback
 from html import escape
@@ -19,11 +20,18 @@ from collections import defaultdict
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
-TEMP_PROBE_CHART_LOCATION = "static/temp_probes_chart.jpg"
-
 
 class PowerControllerViewer:
     """General purpose helper functions for the PowerControllerViewer."""
+
+    # Class-level state cache and locks
+    _state_cache = None
+    _state_cache_timestamp = None
+    _state_lock = threading.RLock()
+    _chart_generation_lock = threading.Lock()
+    _worker_thread = None
+    _worker_stop_event = threading.Event()
+    _reload_lock_file = None  # File-based lock for cross-process coordination
 
     def __init__(self, config: SCConfigManager, logger: SCLogger):
         self.config = config
@@ -36,59 +44,154 @@ class PowerControllerViewer:
 
         self.state_items = []   # List of state items loaded from JSON files
         self.config_last_check = DateHelper.now()
+
+        # Initialize file-based lock for cross-process coordination
+        if PowerControllerViewer._reload_lock_file is None:
+            lock_path = SCCommon.select_file_location("state_data/.reload.lock")
+            PowerControllerViewer._reload_lock_file = lock_path
+
+        # Start worker thread if not already running (only one per process)
+        if PowerControllerViewer._worker_thread is None or not PowerControllerViewer._worker_thread.is_alive():
+            PowerControllerViewer._worker_stop_event.clear()
+            PowerControllerViewer._worker_thread = threading.Thread(
+                target=self._state_loader_worker,
+                daemon=True,
+                name="StateLoaderWorker"
+            )
+            PowerControllerViewer._worker_thread.start()
+            self.logger.log_message(f"Started state loader worker thread (PID: {Path.cwd()})", "debug")
+
         # Perform initial housekeeping which will include loading the state files
         self.housekeeping()
 
+    @classmethod
+    def shutdown_worker(cls):
+        """Stop the worker thread gracefully."""
+        if cls._worker_thread and cls._worker_thread.is_alive():
+            cls._worker_stop_event.set()
+            cls._worker_thread.join(timeout=5)
+
+    def _state_loader_worker(self):
+        """Background worker thread that monitors and reloads state files."""
+        check_interval = 5  # Check every 5 seconds
+
+        while not PowerControllerViewer._worker_stop_event.is_set():
+            try:
+                if self.check_for_state_file_changes():
+                    # Use file lock to ensure only one process reloads at a time
+                    lock_acquired = False
+                    lock_file = None
+                    try:
+                        # Try to acquire lock with timeout
+                        assert isinstance(PowerControllerViewer._reload_lock_file, Path)
+                        lock_file = PowerControllerViewer._reload_lock_file.open("w")
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        lock_acquired = True
+
+                        self.logger.log_message(f"Worker (PID {Path.cwd()}) acquired reload lock, reloading state...", "debug")
+                        self._load_state_files_internal()
+
+                    except BlockingIOError:
+                        # Another process is already reloading, just wait and use cache
+                        self.logger.log_message(f"Worker (PID {Path.cwd()}) detected reload in progress, waiting for cache...", "debug")
+                        time.sleep(1)  # Wait for the other process to finish
+
+                    finally:
+                        if lock_acquired and lock_file:
+                            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                            lock_file.close()
+
+            except (OSError, json.JSONDecodeError, RuntimeError, ValueError, TypeError) as e:
+                self.logger.log_message(f"Error in state loader worker: {e!s}", "error")
+
+            # Wait for the specified interval or until stop event is set
+            PowerControllerViewer._worker_stop_event.wait(check_interval)
+
     def load_state_files(self):
-        """Load the availabke state from the JSON files."""
-        # Look in the state_data subdirectory for the all the available state files
+        """Load the available state from the JSON files (thread-safe)."""
+        # Check if we have a recent cached copy
+        with PowerControllerViewer._state_lock:
+            if PowerControllerViewer._state_cache is not None:
+                # Use cached data if available
+                self.state_items = PowerControllerViewer._state_cache.copy()
+                self.logger.log_message(f"Using cached state data ({len(self.state_items)} items)", "debug")
+                return
 
-        # Initialize the state list
-        self.state_items.clear()
+        # No cache available, try to load but respect cross-process lock
+        lock_acquired = False
+        lock_file = None
+        try:
+            assert isinstance(PowerControllerViewer._reload_lock_file, Path)
+            lock_file = PowerControllerViewer._reload_lock_file.open("w")
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            lock_acquired = True
 
-        if self.state_data_dir.exists() and self.state_data_dir.is_dir():
-            json_files = sorted([f.name for f in self.state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")])
+            self.logger.log_message(f"Initial load acquired lock (PID {Path.cwd()})", "debug")
+            self._load_state_files_internal()
 
-            # Show a warning if we have no state data
-            if not json_files:
-                self.logger.log_message(f"No JSON files found in {self.state_data_dir}.", "warning")
+        except BlockingIOError:
+            # Another process is loading, wait briefly then use cache
+            self.logger.log_message("Initial load waiting for other process...", "debug")
+            time.sleep(2)
+            with PowerControllerViewer._state_lock:
+                if PowerControllerViewer._state_cache is not None:
+                    self.state_items = PowerControllerViewer._state_cache.copy()
 
-            for idx, file_name in enumerate(json_files):
-                if file_name.startswith("."):
-                    # Skip hidden files
-                    continue
+        finally:
+            if lock_acquired and lock_file:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                lock_file.close()
 
-                file_path = Path(self.state_data_dir) / file_name
+    def _load_state_files_internal(self):
+        """Internal method that does the actual file loading and chart generation."""
+        # Acquire both locks to ensure exclusive access for loading and chart generation
+        with PowerControllerViewer._state_lock, PowerControllerViewer._chart_generation_lock:  # noqa: PLR1702
+            # Initialize the state list
+            temp_state_items = []
 
-                self.logger.log_message(f"Attempting to load state file: {file_path}.", "debug")
+            if self.state_data_dir.exists() and self.state_data_dir.is_dir():
+                json_files = sorted([f.name for f in self.state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")])
 
-                try:
-                    state_item = self._safe_read_json(file_path)
+                # Show a warning if we have no state data
+                if not json_files:
+                    self.logger.log_message(f"No JSON files found in {self.state_data_dir}.", "warning")
 
-                    if state_item is not None:
-                        # Decode any datatype hints if it's a PowerController state file
-                        if state_item.get("StateFileType") in {"PowerController", "TempProbes"}:
-                            state_item = JSONEncoder.decode_object(state_item)
-                            assert isinstance(state_item, dict), "Decoded data is not a dictionary."
+                for idx, file_name in enumerate(json_files):
+                    if file_name.startswith("."):
+                        # Skip hidden files
+                        continue
 
-                        if state_item.get("StateFileType") == "TempProbes":
-                            # Generate any required temp probe charts
-                            self._generate_state_data_charts(idx, state_item)
+                    file_path = Path(self.state_data_dir) / file_name
 
-                        self.state_items.append(state_item)
-                        self.logger.log_message(f"Successfully loaded state item {idx + 1} from {file_path}.", "debug")
+                    self.logger.log_message(f"Attempting to load state file: {file_path}.", "debug")
 
-                        file_modified = Path(file_path).stat().st_mtime
-                        if self.last_state_check is None or file_modified > self.last_state_check:
-                            # If the file has been modified since the last check, update the last state check time
-                            self.last_state_check = file_modified
-                    else:
-                        self.logger.log_message(f"Skipped empty or unreadable file: {file_path}.", "warning")
+                    try:
+                        state_item = self._safe_read_json(file_path)
 
-                except (OSError, json.JSONDecodeError) as e:
-                    self.report_fatal_error(f"Error loading JSON from {file_path}: {e}")
+                        if state_item is not None:
+                            # Decode any datatype hints if it's a PowerController state file
+                            if state_item.get("StateFileType") in {"PowerController", "TempProbes"}:
+                                state_item = JSONEncoder.decode_object(state_item)
+                                assert isinstance(state_item, dict), "Decoded data is not a dictionary."
 
-            self.logger.log_message(f"Loaded {len(self.state_items)} state items from {self.state_data_dir}.", "debug")
+                            if state_item.get("StateFileType") == "TempProbes":
+                                # Generate any required temp probe charts
+                                self._generate_state_data_charts(idx, state_item)
+
+                            temp_state_items.append(state_item)
+                            self.logger.log_message(f"Successfully loaded state item {idx + 1} from {file_path}.", "debug")
+                        else:
+                            self.logger.log_message(f"Skipped empty or unreadable file: {file_path}.", "warning")
+
+                    except (OSError, json.JSONDecodeError) as e:
+                        self.report_fatal_error(f"Error loading JSON from {file_path}: {e}")
+
+                self.logger.log_message(f"Loaded {len(temp_state_items)} state items from {self.state_data_dir}.", "debug")
+
+            # Update both instance and class-level cache atomically
+            self.state_items = temp_state_items
+            PowerControllerViewer._state_cache = temp_state_items.copy()
+            PowerControllerViewer._state_cache_timestamp = DateHelper.now()
 
     def validate_state_index(self, requested_state_idx: int | None = None) -> tuple[int | None, int | None]:
         """Validate that a requested state index is within the valid range.
@@ -196,12 +299,10 @@ class PowerControllerViewer:
         Returns:
             result(bool): True if any state file has been modified since the last check, False otherwise.
         """
-        if self.last_state_check is None:
-            return True
-
         # Get the last modified time of the state files
         # Look in the state_data subdirectory for the all the available state files
         filename_concat = ""
+        return_value = False
         if self.state_data_dir.exists() and self.state_data_dir.is_dir():
             json_files = [f for f in self.state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")]
 
@@ -214,16 +315,17 @@ class PowerControllerViewer:
                     continue
 
                 file_modified = file_path.stat().st_mtime
-                if file_modified > self.last_state_check:
+                if not self.last_state_check or file_modified > self.last_state_check:
                     # We have a more recent state file
-                    return True
+                    return_value = True
+                    self.last_state_check = file_modified
 
             if self.last_state_filename_hash != filename_concat:
                 self.logger.log_message(f"State files have changed. Reloading state files from {self.state_data_dir}.", "debug")
                 self.last_state_filename_hash = filename_concat
-                return True
+                return_value = True
 
-        return False
+        return return_value
 
     def housekeeping(self) -> bool:
         """General housekeeping function to be called periodically.
@@ -439,11 +541,13 @@ class PowerControllerViewer:
         """Generate any required state data charts.
 
         Generates the required charts for the provided state item and saves them to the static directory.
+        This method should only be called while holding _chart_generation_lock.
 
         Args:
             state_idx (int): The index of the state item.
             state_item (dict): The state item to generate charts for.
         """
+        # This method is now only called from _load_state_files_internal which holds the lock
         # Delete all existing temp probe charts for this state index
         static_path = SCCommon.select_file_location("static/dummy.jpg")
         state_name = state_item.get("DeviceName") or f"State {state_idx}"
@@ -451,6 +555,7 @@ class PowerControllerViewer:
             self.logger.log_message("Failed to determine static path for temp probe charts.", "error")
             return
         existing_charts = static_path.parent.glob(f"Chart_{state_name}*.jpg")
+        self.logger.log_message(f"Generating temp probe charts for state '{state_name}'.", "debug")
         for chart_file in existing_charts:
             try:
                 chart_file.unlink()

@@ -75,6 +75,11 @@ def _graceful_shutdown(sig: int, frame) -> None:  # noqa: ARG001
     try:  # noqa: PLR1702
         if logger is not None:
             logger.log_message(f"Received signal {sig}. Shutting down gracefully...", "summary")
+
+        # Shutdown the state loader worker thread
+        if helper is not None:
+            PowerControllerViewer.shutdown_worker()
+
         # Try common shutdown methods on helper
         if helper is not None:
             for method_name in ("shutdown", "stop", "shutdown_threads", "stop_threads", "close"):
@@ -87,7 +92,6 @@ def _graceful_shutdown(sig: int, frame) -> None:  # noqa: ARG001
                     except Exception as e:  # noqa: BLE001
                         if logger is not None:
                             logger.log_message(f"Error during helper.{method_name}(): {e!s}", "detailed")
-        # Flush logs if supported
     finally:
         # Exit to stop Flask dev server loop cleanly
         sys.exit(0)
