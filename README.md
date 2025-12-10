@@ -188,7 +188,7 @@ sudo apt install python3-pip python3-venv nginx
 ```bash
 cd /home/pi/scripts/PowerControllerViewer
 source .venv/bin/activate
-gunicorn --bind 192.168.1.20:8000 src/wsgi:app
+.venv/bin/gunicorn --bind 192.168.1.20:8000 --pythonpath src wsgi:app
 ```
 
 Visit http://192.168.1.20:8000/home to confirm it works. If you get an Access Denied message, add the Access Key that you specified in the config file, for example:
@@ -212,7 +212,7 @@ User=pi
 Group=www-data
 WorkingDirectory=/home/pi/scripts/PowerControllerViewer
 Environment="PATH=/home/pi/scripts/PowerControllerViewer/.venv/bin"
-ExecStart=/home/pi/scripts/PowerControllerViewer/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 src/wsgi:app
+ExecStart=/home/pi/scripts/PowerControllerViewer/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 --pythonpath src wsgi:app
 
 [Install]
 WantedBy=multi-user.target
@@ -295,17 +295,22 @@ Go to http://power.abc.com and confirm that you can access the web app from a we
 
 ### Use certbot to get your SSL certificate
 Install certbot:
-`sudo apt install certbot python3-certbot-nginx`
+```bash
+sudo apt install certbot python3-certbot-nginx
+```
 
 Run certbot for your nginx reverse proxy:
-`sudo certbot –nginx`
+```bash
+sudo certbot --nginx
+```
 
 You need to have port 80 open to your reverse proxy for this to work. During the certbot process you will be prompted for your domain name, for example _power.abc.com_.
 
 At the end you will see something like this:
+```bash
 > IMPORTANT NOTES:
->  \- Unable to install the certificate
->  \- Congratulations! Your certificate and chain have been saved at:
+>  - Unable to install the certificate
+>  - Congratulations! Your certificate and chain have been saved at:
 >    /etc/letsencrypt/live/power.abc.com/fullchain.pem
 >    Your key file has been saved at:
 >    /etc/letsencrypt/live/power.abc.com/privkey.pem
@@ -313,10 +318,13 @@ At the end you will see something like this:
 >    tweaked version of this certificate in the future, simply run
 >    certbot again with the "certonly" option. To non-interactively
 >    renew *all* of your certificates, run "certbot renew"
+```
 
 ### Add the SSL certificate keys to your nginx configuration file
 Edit the file:
-`sudo nano /etc/nginx/sites-available/PowerControllerViewer`
+```bash
+sudo nano /etc/nginx/sites-available/PowerControllerViewer`
+```
 
 And change the file so that it now looks like this:
 
