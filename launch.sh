@@ -38,10 +38,10 @@ else
   exit 1
 fi
 
-# On Raspberry Pi, enforce Python 3.13+ if requested
+# On Raspberry Pi, enforce Python 3.11+ if requested
 if [[ $(uname -m) == "armv7l" || $(uname -m) == "aarch64" ]]; then
-  if ! "$UVCmd" python pin --resolved 2>/dev/null | grep -Eq '^(3\.1[3-9]|3\.[2-9][0-9]|[4-9])'; then
-    echo "[launcher] Error: project must pin Python 3.13+ on Raspberry Pi. Run: uv python pin 3.13" >&2
+  if ! "$UVCmd" python pin --resolved 2>/dev/null | grep -Eq '^(3\.1[1-9]|3\.[2-9][0-9]|[4-9])'; then
+    echo "[launcher] Error: project must pin Python 3.11+ on Raspberry Pi. Run: uv python pin 3.11" >&2
     exit 1
   fi
 fi

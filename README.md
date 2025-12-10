@@ -58,6 +58,49 @@ Files:
 | LogfileVerbosity | The level of detail captured in the log file. One of: none; error; warning; summary; detailed; debug; all | 
 | ConsoleVerbosity | Controls the amount of information written to the console. One of: error; warning; summary; detailed; debug; all. Errors are written to stderr all other messages are written to stdout | 
 
+## Project dependencies on a RaspberryPi
+
+This project now depends on the Pillow library. On a Pi, there’s no wheel available for pillow==12.0.0 for your combo (Python 3.13 + aarch64), so uv tries to compile Pillow from source, and that needs system libraries like libjpeg-dev, zlib1g-dev, etc. These aren't installed on a Pi by default, so use these steps to install the underlying image libs"
+
+1. Install build tools and image libraries
+
+```bash
+sudo apt-get update
+```
+
+2. Get the build tools (if you don't already have them)
+
+```bash
+sudo apt-get install -y build-essential python3-dev pkg-config
+```
+
+3. Get the libraries Pillow needs (jpeg + common image deps)
+The absolutely critical one for your error is libjpeg-dev, but the others help Pillow support more formats and avoid other build-time surprises.
+
+```bash
+sudo apt-get install -y \
+  libjpeg-dev \
+  zlib1g-dev \
+  libopenjp2-7-dev \
+  libtiff5-dev \
+  libfreetype6-dev \
+  libwebp-dev \
+  liblcms2-dev \
+  libimagequant-dev \
+  libxcb1-dev \
+  libpng-dev
+```
+
+4. Clear uv’s build cache
+Not strictly necessary, but if it keeps reusing a bad build:
+```bash
+uv cache clean
+```
+
+5. Add matplotlib again to force the compile of pillow
+```bash
+uv add matplotlib
+```
 # Running the web app
 For the remaining steps below, we assume that:
 * Your RaspberryPi is using IP _192.168.1.20_
