@@ -4,6 +4,7 @@ import datetime as dt
 import fcntl
 import inspect
 import json
+import os
 import threading
 import time
 import traceback
@@ -20,18 +21,21 @@ from collections import defaultdict
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
+TEMP_PROBE_CHART_LOCATION = "static/temp_probes_chart.jpg"
+
 
 class PowerControllerViewer:
     """General purpose helper functions for the PowerControllerViewer."""
 
-    # Class-level state cache and locks
+    # Class-level state cache and locks (per-process)
     _state_cache = None
     _state_cache_timestamp = None
     _state_lock = threading.RLock()
     _chart_generation_lock = threading.Lock()
     _worker_thread = None
     _worker_stop_event = threading.Event()
-    _reload_lock_file = None  # File-based lock for cross-process coordination
+    _reload_lock_file = None
+    _cache_metadata_file = None  # Tracks which process last loaded and when
 
     def __init__(self, config: SCConfigManager, logger: SCLogger):
         self.config = config
@@ -45,10 +49,14 @@ class PowerControllerViewer:
         self.state_items = []   # List of state items loaded from JSON files
         self.config_last_check = DateHelper.now()
 
-        # Initialize file-based lock for cross-process coordination
+        # Initialize file-based lock and cache metadata for cross-process coordination
         if PowerControllerViewer._reload_lock_file is None:
             lock_path = SCCommon.select_file_location("state_data/.reload.lock")
             PowerControllerViewer._reload_lock_file = lock_path
+
+        if PowerControllerViewer._cache_metadata_file is None:
+            cache_meta_path = SCCommon.select_file_location("state_data/.cache_metadata.json")
+            PowerControllerViewer._cache_metadata_file = cache_meta_path
 
         # Start worker thread if not already running (only one per process)
         if PowerControllerViewer._worker_thread is None or not PowerControllerViewer._worker_thread.is_alive():
@@ -59,7 +67,7 @@ class PowerControllerViewer:
                 name="StateLoaderWorker"
             )
             PowerControllerViewer._worker_thread.start()
-            self.logger.log_message(f"Started state loader worker thread (PID: {Path.cwd()})", "debug")
+            self.logger.log_message(f"Started state loader worker thread (PID: {os.getpid()})", "debug")
 
         # Perform initial housekeeping which will include loading the state files
         self.housekeeping()
@@ -71,6 +79,35 @@ class PowerControllerViewer:
             cls._worker_stop_event.set()
             cls._worker_thread.join(timeout=5)
 
+    def _get_cache_metadata(self):  # noqa: PLR6301
+        """Read cache metadata to see when state was last loaded.
+
+        Returns:
+            dict | None: The cache metadata dictionary if available, None otherwise.
+        """
+        try:
+            assert isinstance(PowerControllerViewer._cache_metadata_file, Path)
+            if PowerControllerViewer._cache_metadata_file.exists():
+                with PowerControllerViewer._cache_metadata_file.open("r") as f:
+                    return json.load(f)
+        except (OSError, json.JSONDecodeError):
+            pass
+        return None
+
+    def _update_cache_metadata(self, timestamp: float):
+        """Update cache metadata with current load time and process ID."""
+        try:
+            metadata = {
+                "last_load_time": timestamp,
+                "last_load_pid": os.getpid(),
+                "last_load_datetime": DateHelper.now().isoformat()
+            }
+            assert isinstance(PowerControllerViewer._cache_metadata_file, Path)
+            with PowerControllerViewer._cache_metadata_file.open("w") as f:
+                json.dump(metadata, f)
+        except (OSError, json.JSONDecodeError) as e:
+            self.logger.log_message(f"Error updating cache metadata: {e!s}", "warning")
+
     def _state_loader_worker(self):
         """Background worker thread that monitors and reloads state files."""
         check_interval = 5  # Check every 5 seconds
@@ -78,23 +115,45 @@ class PowerControllerViewer:
         while not PowerControllerViewer._worker_stop_event.is_set():
             try:
                 if self.check_for_state_file_changes():
-                    # Use file lock to ensure only one process reloads at a time
+                    # Check if another process recently loaded (within last 10 seconds)
+                    cache_meta = self._get_cache_metadata()
+                    if cache_meta:
+                        last_load_time = cache_meta.get("last_load_time", 0)
+                        last_load_pid = cache_meta.get("last_load_pid")
+                        time_since_load = time.time() - last_load_time
+
+                        if time_since_load < 10 and last_load_pid != os.getpid():
+                            self.logger.log_message(
+                                f"Worker (PID {os.getpid()}) skipping reload - process {last_load_pid} "
+                                f"loaded {time_since_load:.1f}s ago",
+                                "debug"
+                            )
+                            # Wait a bit longer before next check
+                            PowerControllerViewer._worker_stop_event.wait(2)
+                            continue
+
+                    # Try to acquire lock
                     lock_acquired = False
                     lock_file = None
                     try:
-                        # Try to acquire lock with timeout
                         assert isinstance(PowerControllerViewer._reload_lock_file, Path)
                         lock_file = PowerControllerViewer._reload_lock_file.open("w")
                         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                         lock_acquired = True
 
-                        self.logger.log_message(f"Worker (PID {Path.cwd()}) acquired reload lock, reloading state...", "debug")
+                        self.logger.log_message(
+                            f"Worker (PID {os.getpid()}) acquired reload lock, reloading state...",
+                            "debug"
+                        )
                         self._load_state_files_internal()
+                        self._update_cache_metadata(time.time())
 
                     except BlockingIOError:
-                        # Another process is already reloading, just wait and use cache
-                        self.logger.log_message(f"Worker (PID {Path.cwd()}) detected reload in progress, waiting for cache...", "debug")
-                        time.sleep(1)  # Wait for the other process to finish
+                        self.logger.log_message(
+                            f"Worker (PID {os.getpid()}) detected reload in progress by another process",
+                            "debug"
+                        )
+                        time.sleep(2)
 
                     finally:
                         if lock_acquired and lock_file:
@@ -109,15 +168,42 @@ class PowerControllerViewer:
 
     def load_state_files(self):
         """Load the available state from the JSON files (thread-safe)."""
-        # Check if we have a recent cached copy
+        # Check if we have a recent in-process cached copy
         with PowerControllerViewer._state_lock:
             if PowerControllerViewer._state_cache is not None:
-                # Use cached data if available
                 self.state_items = PowerControllerViewer._state_cache.copy()
-                self.logger.log_message(f"Using cached state data ({len(self.state_items)} items)", "debug")
+                self.logger.log_message(
+                    f"Using in-process cached state data ({len(self.state_items)} items)",
+                    "debug"
+                )
                 return
 
-        # No cache available, try to load but respect cross-process lock
+        # Check if another process recently loaded
+        cache_meta = self._get_cache_metadata()
+        if cache_meta:
+            last_load_time = cache_meta.get("last_load_time", 0)
+            last_load_pid = cache_meta.get("last_load_pid")
+            time_since_load = time.time() - last_load_time
+
+            if time_since_load < 15 and last_load_pid != os.getpid():
+                self.logger.log_message(
+                    f"Initial load (PID {os.getpid()}) waiting - process {last_load_pid} "
+                    f"loaded {time_since_load:.1f}s ago, waiting for worker...",
+                    "debug"
+                )
+                # Wait for worker thread to populate cache
+                for _ in range(10):  # Wait up to 5 seconds
+                    time.sleep(0.5)
+                    with PowerControllerViewer._state_lock:
+                        if PowerControllerViewer._state_cache is not None:
+                            self.state_items = PowerControllerViewer._state_cache.copy()
+                            self.logger.log_message(
+                                f"Using worker-populated cache ({len(self.state_items)} items)",
+                                "debug"
+                            )
+                            return
+
+        # No cache available or too old, try to load
         lock_acquired = False
         lock_file = None
         try:
@@ -126,13 +212,16 @@ class PowerControllerViewer:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             lock_acquired = True
 
-            self.logger.log_message(f"Initial load acquired lock (PID {Path.cwd()})", "debug")
+            self.logger.log_message(f"Initial load (PID {os.getpid()}) acquired lock", "debug")
             self._load_state_files_internal()
+            self._update_cache_metadata(time.time())
 
         except BlockingIOError:
-            # Another process is loading, wait briefly then use cache
-            self.logger.log_message("Initial load waiting for other process...", "debug")
-            time.sleep(2)
+            self.logger.log_message(
+                f"Initial load (PID {os.getpid()}) waiting for other process...",
+                "debug"
+            )
+            time.sleep(3)
             with PowerControllerViewer._state_lock:
                 if PowerControllerViewer._state_cache is not None:
                     self.state_items = PowerControllerViewer._state_cache.copy()
@@ -537,48 +626,6 @@ class PowerControllerViewer:
                 return default
             return value
 
-    def _generate_state_data_charts(self, state_idx: int, state_item: dict):
-        """Generate any required state data charts.
-
-        Generates the required charts for the provided state item and saves them to the static directory.
-        This method should only be called while holding _chart_generation_lock.
-
-        Args:
-            state_idx (int): The index of the state item.
-            state_item (dict): The state item to generate charts for.
-        """
-        # This method is now only called from _load_state_files_internal which holds the lock
-        # Delete all existing temp probe charts for this state index
-        static_path = SCCommon.select_file_location("static/dummy.jpg")
-        state_name = state_item.get("DeviceName") or f"State {state_idx}"
-        if not static_path:
-            self.logger.log_message("Failed to determine static path for temp probe charts.", "error")
-            return
-        existing_charts = static_path.parent.glob(f"Chart_{state_name}*.jpg")
-        self.logger.log_message(f"Generating temp probe charts for state '{state_name}'.", "debug")
-        for chart_file in existing_charts:
-            try:
-                chart_file.unlink()
-            except OSError as e:
-                self.logger.log_message(f"Error deleting existing temp probe chart {chart_file}: {e}", "warning")
-
-        # If the state item is temp probe data, generate the temp probe charts now
-        probe_history = state_item.get("TempProbeLogging", {}).get("history", []) or []
-        if not probe_history or "TempProbeLogging" not in state_item or not state_item.get("Charting", {}).get("Enable"):
-            return
-
-        charting_config = state_item.get("Charting", {}).get("Charts", []) or []
-        # Loop through the Charts in the charting config and generate a chart for each one
-        state_item["TempProbeCharts"] = []
-        for config_idx, chart_config in enumerate(charting_config):
-            chart_name = chart_config.get("Name", f"Chart {state_name}-{config_idx}")
-            chart_file_name = f"Chart_{state_name}-{config_idx}.jpg"
-            probe_names = chart_config.get("Probes", [])
-            days_to_show = chart_config.get("DaysToShow", 7)
-
-            if self._generate_temp_probe_chart(probe_history, chart_file_name, chart_name=chart_name, probe_names=probe_names, days_to_show=days_to_show):
-                state_item["TempProbeCharts"].append(chart_file_name)
-
     # ============ PRIVATE FUNCTIONS ========================================================================
     def _safe_read_json(self, file_path: Path, max_retries: int = 3, retry_delay: float = 0.1):
         """Safely read JSON file with locking and retries.
@@ -657,7 +704,58 @@ class PowerControllerViewer:
         """Allows setting values in the state dictionary using square brackets."""
         self.state_items[index] = value
 
-    def _generate_temp_probe_chart(self, probe_data: list[dict], file_name: str, chart_name: str | None = None, probe_names: list[str] | None = None, days_to_show: int | None = None) -> bool:
+    def _generate_state_data_charts(self, state_idx: int, state_item: dict):
+        """Generate any required state data charts.
+
+        Generates the required charts for the provided state item and saves them to the static directory.
+        This method should only be called while holding _chart_generation_lock.
+
+        Args:
+            state_idx (int): The index of the state item.
+            state_item (dict): The state item to generate charts for.
+        """
+        # This method is now only called from _load_state_files_internal which holds the lock
+        # Delete all existing temp probe charts for this state index
+        static_path = SCCommon.select_file_location("static/dummy.jpg")
+        if static_path is None:
+            self.logger.log_message("Failed to determine static path for temp probe charts.", "error")
+            return
+
+        static_dir = static_path.parent
+        state_name = state_item.get("DeviceName") or f"State {state_idx}"
+        self.logger.log_message(f"Generating temp probe charts for state '{state_name}'.", "debug")
+
+        # Use proper glob pattern with the directory
+        chart_pattern = f"Chart_{state_name}*.jpg"
+        existing_charts = list(static_dir.glob(chart_pattern))
+        for chart_file in existing_charts:
+            try:
+                chart_file.unlink()
+            except OSError as e:
+                self.logger.log_message(f"Error deleting existing temp probe chart {chart_file}: {e}", "warning")
+
+        # if existing_charts:
+        #     self.logger.log_message(f"Found {len(existing_charts)} existing charts for '{state_name}': {[c.name for c in existing_charts]}", "debug")
+
+        # If the state item is temp probe data, generate the temp probe charts now
+        probe_history = state_item.get("TempProbeLogging", {}).get("history", []) or []
+        if not probe_history or "TempProbeLogging" not in state_item or not state_item.get("Charting", {}).get("Enable"):
+            return
+
+        charting_config = state_item.get("Charting", {}).get("Charts", []) or []
+        # Loop through the Charts in the charting config and generate a chart for each one
+        state_item["TempProbeCharts"] = []
+        chart_count = len(charting_config)
+        for config_idx, chart_config in enumerate(charting_config):
+            chart_name = chart_config.get("Name", f"Chart {state_name}-{config_idx}")
+            chart_file_name = f"Chart_{state_name}-{config_idx}.jpg"
+            probe_names = chart_config.get("Probes", [])
+            days_to_show = chart_config.get("DaysToShow", 7)
+
+            if self._generate_temp_probe_chart(probe_history, chart_file_name, chart_name=chart_name, probe_names=probe_names, days_to_show=days_to_show, chart_count=chart_count):
+                state_item["TempProbeCharts"].append(chart_file_name)
+
+    def _generate_temp_probe_chart(self, probe_data: list[dict], file_name: str, chart_name: str | None = None, probe_names: list[str] | None = None, days_to_show: int | None = None, chart_count: int = 0) -> bool:  # noqa: PLR0912, PLR0914, PLR0915
         """Generate a temperature probe chart from the provided probe data.
 
         Args:
@@ -667,6 +765,7 @@ class PowerControllerViewer:
             chart_name (str | None): Optional name for the chart.
             probe_names (list[str] | None): Optional list of probe names to include in the chart. If None, all probes are included.
             days_to_show (int | None): Optional number of days to show in the chart. If None, all data is shown.
+            chart_count (int): Optional total number of charts being generated (for scaling purposes). Use 0 for default.
 
         Returns:
             bool: True if the chart was generated successfully, False otherwise.
@@ -706,22 +805,75 @@ class PowerControllerViewer:
             max_temp = max(all_temps) + 2
 
             # Create the plot
-            fig, ax = plt.subplots(figsize=(12, 4))
+            if chart_count == 2:
+                plot_height = 3.5
+            elif chart_count >= 3:
+                plot_height = 2.5
+            else:
+                plot_height = 6
+            fig, ax = plt.subplots(figsize=(15, plot_height))
+
+            # Define a color map to ensure consistent colors per probe
+            cmap = plt.cm.get_cmap("tab10")
+            colors = [cmap(i) for i in range(10)]  # Get the first 10 colors from tab10 colormap
+            probe_colors = {name: colors[i % len(colors)] for i, name in enumerate(sorted(probe_series.keys()))}
 
             # Plot each probe's data
             for probe_name, data in probe_series.items():
-                ax.plot(data["timestamps"], data["temperatures"],
-                       marker="o", linestyle="-", linewidth=2, markersize=4,
-                       label=probe_name)
+                timestamps = data["timestamps"]
+                temperatures = data["temperatures"]
+
+                if len(timestamps) <= 1:
+                    # Single point or no data
+                    ax.plot(timestamps, temperatures,
+                           marker="o", linestyle="", markersize=4,
+                           label=probe_name)
+                else:
+                    # Find gaps larger than 24 hours
+                    segments_x = []
+                    segments_y = []
+                    current_x = [timestamps[0]]
+                    current_y = [temperatures[0]]
+
+                    for i in range(1, len(timestamps)):
+                        time_gap = (timestamps[i] - timestamps[i - 1]).total_seconds() / 3600  # hours
+
+                        if time_gap > 24:  # Gap larger than 24 hours
+                            # End current segment
+                            segments_x.append(current_x)
+                            segments_y.append(current_y)
+                            # Start new segment
+                            current_x = [timestamps[i]]
+                            current_y = [temperatures[i]]
+                        else:
+                            # Continue current segment
+                            current_x.append(timestamps[i])
+                            current_y.append(temperatures[i])
+
+                    # Add the last segment
+                    segments_x.append(current_x)
+                    segments_y.append(current_y)
+
+                    # Plot each segment separately
+                    for j, (seg_x, seg_y) in enumerate(zip(segments_x, segments_y, strict=False)):
+                        label_name = probe_name if j == 0 else None  # Only label first segment
+                        ax.plot(seg_x,
+                                seg_y,
+                                marker="o",
+                                linestyle="-",
+                                linewidth=2,
+                                markersize=4,
+                                label=label_name,
+                                color=probe_colors[probe_name])
 
             # Configure axes
-            ax.set_xlabel("Date", fontsize=12)
+            # ax.set_xlabel("Date", fontsize=12)
             ax.set_ylabel("Temperature °C", fontsize=12)
             ax.set_ylim(min_temp, max_temp)
             ax.grid(True, alpha=0.3)
 
             # Format X-axis dates
-            ax.xaxis.set_major_formatter(mdates.DateFormatter("%d-%b"))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%d-%b %-I %p"))
             ax.xaxis.set_major_locator(mdates.AutoDateLocator())
             fig.autofmt_xdate()
 
@@ -731,7 +883,9 @@ class PowerControllerViewer:
 
             # Add chart title
             if chart_name:
-                ax.set_title(chart_name, fontsize=14)
+                ax.text(0.01, 0.95, chart_name, transform=ax.transAxes, fontsize=14,
+                       verticalalignment="top", horizontalalignment="left",
+                       bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "alpha": 0.8})
 
             # Save the chart
             chart_path = SCCommon.select_file_location(f"static/{file_name}")

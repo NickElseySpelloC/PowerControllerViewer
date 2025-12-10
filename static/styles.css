@@ -111,6 +111,7 @@ table table th, table table td {
     font-size: 2.5vw; /* Fallback for older browsers */
     font-size: clamp(1rem, 2.5vw, 6rem);
     text-align: center;
+    color: gray;
 }
 
 /* For iOS 12 and older browsers, use media queries */
@@ -129,6 +130,7 @@ table table th, table table td {
 .info_text_time {
     font-size: 0.9vw;
     font-size: clamp(0.7rem, 0.9vw, 1.2rem);
+    color: gray;
 }
 
 @media (max-width: 480px) {
@@ -203,8 +205,8 @@ table table th, table table td {
 }
 
 .temp_probe_chart {
-    margin-top: 25px; 
-    width: 80%;
+    margin-top: 0px; 
+    width: 90%;
     height: auto;
     /* max-height: 400px; */
     object-fit: contain;

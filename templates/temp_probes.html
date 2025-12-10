@@ -86,6 +86,19 @@
 
         
     </div>
+    <!-- Navigation Buttons -->
+    <div>
+        <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
+            class="button">
+            Home
+        </a>
+        {% if page_data['NextIndex'] is not none %}
+            <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
+            class="button">
+            Go to {{ page_data['NextDeviceName'] }} >>>
+            </a>
+        {% endif %}
+    </div>    
     <script 
         type="text/javascript" 
         src="{{ url_for('static', filename='index.js') }}"

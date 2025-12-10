@@ -252,8 +252,13 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
         target_hours = 0
         if run_history_days:
             run_history_today = run_history_days[-1]
-            actual_hours = run_history_today["ActualHours"]
-            target_hours = run_history_today["TargetHours"]
+            actual_hours = run_history_today.get("ActualHours", 0) or 0
+            target_hours = run_history_today.get("TargetHours")
+            prior_shortfall = run_history_today.get("PriorShortfall", 0) or 0
+        if target_hours is None:
+            planned_hours = None
+        else:
+            planned_hours = target_hours + prior_shortfall - actual_hours
 
         # Build a summary of the run plan
         run_plan_summary = []
@@ -283,6 +288,8 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
             "IsDeviceRunning": output_data.get("IsOn", False),
             "PumpStatus": "Not running" if not output_data.get("IsOn", False) else "Started at " + (pump_start_time.strftime("%H:%M:%S") if pump_start_time else "Unknown"),
             "TargetRuntime": "All" if target_hours is None else helper.hours_to_string(target_hours),
+            "PriorShortfall": helper.hours_to_string(prior_shortfall),
+            "PlannedRuntime": "All" if planned_hours is None else helper.hours_to_string(planned_hours),
             "ActualRuntime": helper.hours_to_string(actual_hours),
             "RemainingRuntime": helper.hours_to_string(run_plan.get("RemainingHours", 0)),
             "AverageDailyRuntime": helper.hours_to_string(run_history.get("CurrentTotals", {}).get("ActualHoursPerDay", 0)),
@@ -547,9 +554,15 @@ def build_power_daily_data(state_idx: int, day: int, max_day: int) -> dict:  # n
         assert isinstance(day_data, dict)
 
         page_date = day_data.get("Date")
-        actual_runtime = helper.hours_to_string(day_data.get("ActualHours", 0) or 0) + " hours run"
-        if (run_plan.get("RemainingHours", 0) or 0) > 0:
-            actual_runtime += ", " + helper.hours_to_string(run_plan.get("RemainingHours", 0) or 0) + " hours remaining"
+        target_hours = day_data.get("TargetHours")
+        prior_shortfall = day_data.get("PriorShortfall", 0) or 0
+        actual_hours = day_data.get("ActualHours", 0) or 0
+        actual_runtime = helper.hours_to_string(actual_hours) + " hours run"
+        remaining_hours = 0
+        if target_hours:
+            remaining_hours = max(0, target_hours + prior_shortfall - actual_hours)
+        if remaining_hours > 0.01666667:  # 1 minute
+            actual_runtime += ", " + helper.hours_to_string(remaining_hours) + " hours remaining"
 
         energy_usage = f"{(day_data.get('EnergyUsed', 0) or 0) / 1000:.2f} kWh"
         average_price = day_data.get("AveragePrice", 0) or 0
@@ -567,8 +580,8 @@ def build_power_daily_data(state_idx: int, day: int, max_day: int) -> dict:  # n
             "DeviceName": output_data.get("Name", "Unknown"),
             "Date": (page_date.strftime("%d/%m/%Y") if page_date else "Unknown"),
             "DateLong": helper.format_date_with_ordinal(page_date),
-            "Shortfall": helper.hours_to_string(day_data.get("PriorShortfall", 0) or 0),
-            "TargetRuntime": "All" if day_data.get("TargetHours") is None else helper.hours_to_string(day_data.get("TargetHours", 0) or 0),
+            "Shortfall": helper.hours_to_string(prior_shortfall),
+            "TargetRuntime": "All" if target_hours is None else helper.hours_to_string(target_hours or 0),
             "ActualRuntime": actual_runtime,
             "EnergyUsed": energy_usage,
             "HaveRunPlan": len(day_data.get("DeviceRuns", [])) > 0,
@@ -583,10 +596,9 @@ def build_power_daily_data(state_idx: int, day: int, max_day: int) -> dict:  # n
             start_time = run.get("StartTime").strftime("%H:%M")
             if run.get("EndTime") is None:
                 end_time = "Running"
-                duration_str = ""
             else:
                 end_time = run.get("EndTime").strftime("%H:%M")
-                duration_str = helper.hours_to_string(run.get("ActualHours", 0))
+            duration_str = helper.hours_to_string(run.get("ActualHours", 0))
 
             price = "Unknown" if run.get("AveragePrice") is None else f"{round(run.get('AveragePrice'), 1)} c/kWh"
             device_runs.append({
