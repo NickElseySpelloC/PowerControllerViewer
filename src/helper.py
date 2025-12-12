@@ -258,10 +258,9 @@ class PowerControllerViewer:
                         state_item = self._safe_read_json(file_path)
 
                         if state_item is not None:
-                            # Decode any datatype hints if it's a PowerController state file
-                            if state_item.get("StateFileType") in {"PowerController", "TempProbes"}:
-                                state_item = JSONEncoder.decode_object(state_item)
-                                assert isinstance(state_item, dict), "Decoded data is not a dictionary."
+                            # Decode any datatype hints - all file types now
+                            state_item = JSONEncoder.decode_object(state_item)
+                            assert isinstance(state_item, dict), "Decoded data is not a dictionary."
 
                             if state_item.get("StateFileType") == "TempProbes":
                                 # Generate any required temp probe charts

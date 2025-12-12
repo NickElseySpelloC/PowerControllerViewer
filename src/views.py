@@ -84,7 +84,7 @@ def home():  # noqa: PLR0912, PLR0915
         device_description = "Unknown"
         last_save_time = DateHelper.now()
         if state_file_type == "LightingControl":
-            last_save_time = DateHelper.parse_date(helper.get_state(state_idx, "LastStateSaveTime", default=DateHelper.now_str()), "%Y-%m-%d %H:%M:%S")
+            last_save_time = helper.get_state(state_idx, "LastStateSaveTime", default=DateHelper.now())
             device_description = "Lighting Controller"
         elif state_file_type == "PowerController":
             last_save_time = helper.get_state(state_idx, "SaveTime", default=DateHelper.now())
@@ -330,9 +330,8 @@ def build_lightingcontrol_homepage(state_idx: int, state_next_idx: int | None, d
 
     client_ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "Unknown"
 
-    try:
-        last_save_time_str = helper.get_state(state_idx, "LastStateSaveTime", default=None)
-        last_save_time = DateHelper.parse_date(last_save_time_str, "%Y-%m-%d %H:%M:%S") if last_save_time_str else DateHelper.now()
+    try:  # noqa: PLR1702
+        last_save_time = helper.get_state(state_idx, "LastStateSaveTime", default=None) or DateHelper.now()
         logger.log_message(f"Home: rendering device {helper.get_state(state_idx, 'DeviceName', default='Unknown')} of type LightingControl for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]
 
         # Build a dict object that we will use to pass the information to the web page
@@ -346,8 +345,8 @@ def build_lightingcontrol_homepage(state_idx: int, state_next_idx: int | None, d
             "LastStatusMessage": helper.get_state(state_idx, "LastStatusMessage", default="Unknown"),
             "NextDeviceName": helper.get_state(state_next_idx, "DeviceName", default="Unknown") if state_next_idx is not None else None,
             "TimeNow": DateHelper.now_str(),
-            "DuskTime": helper.get_state(state_idx, "Dusk", default=None),
-            "DawnTime": helper.get_state(state_idx, "Dawn", default=None),
+            "DuskTime": helper.get_state(state_idx, "Dusk").strftime("%H:%M") if isinstance(helper.get_state(state_idx, "Dusk"), dt.datetime) else None,
+            "DawnTime": helper.get_state(state_idx, "Dawn").strftime("%H:%M") if isinstance(helper.get_state(state_idx, "Dawn"), dt.datetime) else None,
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
             "HaveSwitchStates": len(helper.get_state(state_idx, "SwitchStates", default=[])) > 0,
             "SwitchStates": helper.get_state(state_idx, "SwitchStates", default=[]),
@@ -381,8 +380,9 @@ def build_lightingcontrol_homepage(state_idx: int, state_next_idx: int | None, d
                 # Convert the date strings to datetime objects
                 if "DatesOff" in event and isinstance(event["DatesOff"], list):
                     for rng in event["DatesOff"]:
-                        rng["StartDateAU"] = DateHelper.parse_date(rng["StartDate"], "%Y-%m-%d").strftime("%-d %b %y")  # type: ignore[attr-defined]
-                        rng["EndDateAU"] = DateHelper.parse_date(rng["EndDate"], "%Y-%m-%d").strftime("%-d %b %y")  # type: ignore[attr-defined]
+                        if rng.get("StartDate") and rng.get("EndDate"):
+                            rng["StartDateAU"] = rng.get("StartDate").strftime("%-d %b %y")  # type: ignore[attr-defined]
+                            rng["EndDateAU"] = rng.get("EndDate").strftime("%-d %b %y")  # type: ignore[attr-defined]
 
     except KeyError as e:
         error_message = f"An error occurred while rendering a LightingControl summary page: {e}"
@@ -645,9 +645,27 @@ def build_lightingcontrol_daily_data(state_idx: int, day: int, max_day: int) -> 
     try:
         # Build the dict object that we will use to pass the information to the web page
         day_data = switch_events[day] or {}
-        page_date = DateHelper.parse_date(day_data.get("Date"), "%Y-%m-%d")  # pyright: ignore[reportArgumentType]
+        page_date = day_data.get("Date")  # pyright: ignore[reportArgumentType]
 
-        logger.log_message(f"Daily: rendering device {helper.get_state(state_idx, 'DeviceName', default='Unknown')} and day {(page_date.strftime('%d/%m/%Y') if page_date else 'Unknown')} for client {client_ip}. State timestamp: {helper.get_state(state_idx, 'LastStateSaveTime')}", "all")
+        logger.log_message(f"Daily: rendering device {helper.get_state(state_idx, 'DeviceName', default='Unknown')} and day {(page_date.strftime('%d/%m/%Y') if page_date else 'Unknown')} for client {client_ip}. State timestamp: {helper.get_state(state_idx, 'LastStateSaveTime').strftime('%d/%m/%Y')}", "all")
+
+        # Loop through the Events and format the StartTime and EndTime
+        event_data = []
+        for event in day_data.get("Events", []):
+            if event.get("Schedule"):
+                trigger = event.get("Schedule")
+            elif event.get("Input"):
+                trigger = event.get("Input")
+            else:
+                trigger = "No Trigger"
+
+            new_item = {
+                "Time": event.get("Time").strftime("%H:%M") if isinstance(event.get("Time"), dt.time) else "Unknown",
+                "Switch": event.get("Switch", "Unknown"),
+                "Trigger": trigger,
+                "State": event.get("State", "OFF"),
+            }
+            event_data.append(new_item)
 
         daily_data = {
             "AccessKey": config.get("Website", "AccessKey"),
@@ -657,7 +675,7 @@ def build_lightingcontrol_daily_data(state_idx: int, day: int, max_day: int) -> 
             "Date": (page_date.strftime("%d/%m/%Y") if page_date else "Unknown"),
             "DateLong": helper.format_date_with_ordinal(page_date),
             "HaveEvents": len(day_data.get("Events", [])) > 0,
-            "Events": day_data.get("Events", []),
+            "Events": event_data,
             "CurrentDay": day,
             "PreviousDay": day + 1 if day < max_day else None,
             "NextDay": day - 1 if day > 0 else None,
@@ -719,6 +737,7 @@ def submit_data():
             # Check for some required required keys and their types
             required_keys = {
                 "SaveTime": str,
+                "SchemaVersion": int,
                 "DeviceName": str,
                 "Output": dict,
                 "Scheduler": dict,
@@ -726,6 +745,9 @@ def submit_data():
         elif state_type == "LightingControl":
             # Check for some required required keys and their types
             required_keys = {
+                "LastStateSaveTime": str,
+                "SchemaVersion": int,
+                "DeviceName": str,
                 "RandomOffsets": dict,
                 "SwitchStates": list,
                 }
@@ -734,6 +756,7 @@ def submit_data():
             # Check for some required required keys and their types
             required_keys = {
                 "SaveTime": str,
+                "SchemaVersion": int,
                 "DeviceName": str,
                 "TempProbeLogging": dict,
                 }

@@ -51,17 +51,9 @@
                 <tbody>
                     {% for event in page_data['Events']|reverse %}
                         <tr>
-                            <td>{{ event['Time'][:5] }}</td>
+                            <td>{{ event['Time'] }}</td>
                             <td>{{ event['Switch'] }}</td>
-                            <td>
-                                {% if event['Schedule'] %} 
-                                    Schedule: {{ event['Schedule'] }}
-                                {% elif event['Input'] %}
-                                    Input: {{ event['Input'] }}
-                                {% else %}
-                                    No Trigger
-                                {% endif %}
-                            </td>
+                            <td>{{ event['Trigger'] }}</td>
                             <td>
                                 {% if event['State'] == 'ON' %} 
                                     <span class="circle green-circle"></span> On
