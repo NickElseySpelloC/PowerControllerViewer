@@ -230,7 +230,7 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
         assert isinstance(run_plan, dict)
         run_history = output_data.get("RunHistory", {}) or {}
         assert isinstance(run_history, dict)
-        last_save_time = state_data.get("SaveTime", DateHelper.now())
+        last_save_time = state_data.get("LocalLastSaveTime", DateHelper.now())
         logger.log_message(f"Home: rendering device {state_data.get('DeviceName')} of type PowerController for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]
 
         pump_start_time = None
@@ -324,7 +324,7 @@ def build_lightingcontrol_homepage(state_idx: int, state_next_idx: int | None, d
     client_ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "Unknown"
 
     try:  # noqa: PLR1702
-        last_save_time = helper.get_state(state_idx, "LastStateSaveTime", default=None) or DateHelper.now()
+        last_save_time = helper.get_state(state_idx, "LocalLastSaveTime", default=None) or DateHelper.now()
         logger.log_message(f"Home: rendering device {helper.get_state(state_idx, 'DeviceName', default='Unknown')} of type LightingControl for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]
 
         # Build a dict object that we will use to pass the information to the web page
@@ -409,7 +409,7 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
         assert isinstance(state_data, dict)
         probe_data = state_data.get("TempProbeLogging", {}).get("probes", []) or []
         assert isinstance(probe_data, list)
-        last_save_time = state_data.get("SaveTime", DateHelper.now())
+        last_save_time = state_data.get("LocalLastSaveTime", DateHelper.now())
         logger.log_message(f"Home: rendering device {state_data.get('DeviceName')} of type PowerController for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]
 
         # Build a summary of the temp probes
@@ -433,6 +433,7 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
             "TimeNow": DateHelper.now_str(),
             "DeviceName": state_data.get("DeviceName", "Unknown"),
             "DebugMessage": debug_message,
+            "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
             "TempProbes": temp_probe_summary,
             "TempProbeCharts": state_data.get("TempProbeCharts"),
             }

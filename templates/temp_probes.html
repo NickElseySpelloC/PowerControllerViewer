@@ -99,6 +99,9 @@
             </a>
         {% endif %}
     </div>    
+    <div class="footer_text" style="margin-top: 10px;">
+        Last updated {{ page_data['LastCheck'] }}
+    </div>
     <script 
         type="text/javascript" 
         src="{{ url_for('static', filename='index.js') }}"
