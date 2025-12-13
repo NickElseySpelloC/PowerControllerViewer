@@ -93,6 +93,11 @@ table table th, table table td {
     background-color: #000000;
 }
 
+.footer_text {
+    font-size: 0.8em;
+    color: #1d1c1c8e;
+    margin-top: 20px;
+} 
 .info_table {
     border: none;
     width: 100%;

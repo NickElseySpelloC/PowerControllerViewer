@@ -30,6 +30,7 @@ class PowerControllerViewer:
     # Class-level state cache and locks (per-process)
     _state_cache = None
     _state_cache_timestamp = None
+    _state_latest_save_timestamp = None
     _state_lock = threading.RLock()
     _chart_generation_lock = threading.Lock()
     _worker_thread = None
@@ -78,93 +79,6 @@ class PowerControllerViewer:
         if cls._worker_thread and cls._worker_thread.is_alive():
             cls._worker_stop_event.set()
             cls._worker_thread.join(timeout=5)
-
-    def _get_cache_metadata(self):  # noqa: PLR6301
-        """Read cache metadata to see when state was last loaded.
-
-        Returns:
-            dict | None: The cache metadata dictionary if available, None otherwise.
-        """
-        try:
-            assert isinstance(PowerControllerViewer._cache_metadata_file, Path)
-            if PowerControllerViewer._cache_metadata_file.exists():
-                with PowerControllerViewer._cache_metadata_file.open("r") as f:
-                    return json.load(f)
-        except (OSError, json.JSONDecodeError):
-            pass
-        return None
-
-    def _update_cache_metadata(self, timestamp: float):
-        """Update cache metadata with current load time and process ID."""
-        try:
-            metadata = {
-                "last_load_time": timestamp,
-                "last_load_pid": os.getpid(),
-                "last_load_datetime": DateHelper.now().isoformat()
-            }
-            assert isinstance(PowerControllerViewer._cache_metadata_file, Path)
-            with PowerControllerViewer._cache_metadata_file.open("w") as f:
-                json.dump(metadata, f)
-        except (OSError, json.JSONDecodeError) as e:
-            self.logger.log_message(f"Error updating cache metadata: {e!s}", "warning")
-
-    def _state_loader_worker(self):
-        """Background worker thread that monitors and reloads state files."""
-        check_interval = 5  # Check every 5 seconds
-
-        while not PowerControllerViewer._worker_stop_event.is_set():
-            try:
-                if self.check_for_state_file_changes():
-                    # Check if another process recently loaded (within last 10 seconds)
-                    cache_meta = self._get_cache_metadata()
-                    if cache_meta:
-                        last_load_time = cache_meta.get("last_load_time", 0)
-                        last_load_pid = cache_meta.get("last_load_pid")
-                        time_since_load = time.time() - last_load_time
-
-                        if time_since_load < 10 and last_load_pid != os.getpid():
-                            self.logger.log_message(
-                                f"Worker (PID {os.getpid()}) skipping reload - process {last_load_pid} "
-                                f"loaded {time_since_load:.1f}s ago",
-                                "debug"
-                            )
-                            # Wait a bit longer before next check
-                            PowerControllerViewer._worker_stop_event.wait(2)
-                            continue
-
-                    # Try to acquire lock
-                    lock_acquired = False
-                    lock_file = None
-                    try:
-                        assert isinstance(PowerControllerViewer._reload_lock_file, Path)
-                        lock_file = PowerControllerViewer._reload_lock_file.open("w")
-                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                        lock_acquired = True
-
-                        self.logger.log_message(
-                            f"Worker (PID {os.getpid()}) acquired reload lock, reloading state...",
-                            "debug"
-                        )
-                        self._load_state_files_internal()
-                        self._update_cache_metadata(time.time())
-
-                    except BlockingIOError:
-                        self.logger.log_message(
-                            f"Worker (PID {os.getpid()}) detected reload in progress by another process",
-                            "debug"
-                        )
-                        time.sleep(2)
-
-                    finally:
-                        if lock_acquired and lock_file:
-                            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-                            lock_file.close()
-
-            except (OSError, json.JSONDecodeError, RuntimeError, ValueError, TypeError) as e:
-                self.logger.log_message(f"Error in state loader worker: {e!s}", "error")
-
-            # Wait for the specified interval or until stop event is set
-            PowerControllerViewer._worker_stop_event.wait(check_interval)
 
     def load_state_files(self):
         """Load the available state from the JSON files (thread-safe)."""
@@ -230,56 +144,6 @@ class PowerControllerViewer:
             if lock_acquired and lock_file:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
                 lock_file.close()
-
-    def _load_state_files_internal(self):
-        """Internal method that does the actual file loading and chart generation."""
-        # Acquire both locks to ensure exclusive access for loading and chart generation
-        with PowerControllerViewer._state_lock, PowerControllerViewer._chart_generation_lock:  # noqa: PLR1702
-            # Initialize the state list
-            temp_state_items = []
-
-            if self.state_data_dir.exists() and self.state_data_dir.is_dir():
-                json_files = sorted([f.name for f in self.state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")])
-
-                # Show a warning if we have no state data
-                if not json_files:
-                    self.logger.log_message(f"No JSON files found in {self.state_data_dir}.", "warning")
-
-                for idx, file_name in enumerate(json_files):
-                    if file_name.startswith("."):
-                        # Skip hidden files
-                        continue
-
-                    file_path = Path(self.state_data_dir) / file_name
-
-                    self.logger.log_message(f"Attempting to load state file: {file_path}.", "debug")
-
-                    try:
-                        state_item = self._safe_read_json(file_path)
-
-                        if state_item is not None:
-                            # Decode any datatype hints - all file types now
-                            state_item = JSONEncoder.decode_object(state_item)
-                            assert isinstance(state_item, dict), "Decoded data is not a dictionary."
-
-                            if state_item.get("StateFileType") == "TempProbes":
-                                # Generate any required temp probe charts
-                                self._generate_state_data_charts(idx, state_item)
-
-                            temp_state_items.append(state_item)
-                            self.logger.log_message(f"Successfully loaded state item {idx + 1} from {file_path}.", "debug")
-                        else:
-                            self.logger.log_message(f"Skipped empty or unreadable file: {file_path}.", "warning")
-
-                    except (OSError, json.JSONDecodeError) as e:
-                        self.report_fatal_error(f"Error loading JSON from {file_path}: {e}")
-
-                self.logger.log_message(f"Loaded {len(temp_state_items)} state items from {self.state_data_dir}.", "debug")
-
-            # Update both instance and class-level cache atomically
-            self.state_items = temp_state_items
-            PowerControllerViewer._state_cache = temp_state_items.copy()
-            PowerControllerViewer._state_cache_timestamp = DateHelper.now()
 
     def validate_state_index(self, requested_state_idx: int | None = None) -> tuple[int | None, int | None]:
         """Validate that a requested state index is within the valid range.
@@ -625,7 +489,193 @@ class PowerControllerViewer:
                 return default
             return value
 
+    @staticmethod
+    def get_last_state_reload() -> dt.datetime | None:
+        """Get the timestamp of the last state reload.
+
+        Returns:
+            dt.datetime: The timestamp of the last state reload, or None if never reloaded.
+        """
+        return PowerControllerViewer._state_cache_timestamp
+
+    @staticmethod
+    def get_latest_state_modification_time() -> dt.datetime | None:
+        """Get the latest modification time of any state file in the state data directory.
+
+        Returns:
+            dt.datetime: The latest modification time, or None if no state files exist.
+        """
+        return PowerControllerViewer._state_latest_save_timestamp
+
     # ============ PRIVATE FUNCTIONS ========================================================================
+
+    def _get_cache_metadata(self):  # noqa: PLR6301
+        """Read cache metadata to see when state was last loaded.
+
+        Returns:
+            dict | None: The cache metadata dictionary if available, None otherwise.
+        """
+        try:
+            assert isinstance(PowerControllerViewer._cache_metadata_file, Path)
+            if PowerControllerViewer._cache_metadata_file.exists():
+                with PowerControllerViewer._cache_metadata_file.open("r") as f:
+                    return json.load(f)
+        except (OSError, json.JSONDecodeError):
+            pass
+        return None
+
+    def _update_cache_metadata(self, timestamp: float):
+        """Update cache metadata with current load time and process ID."""
+        try:
+            metadata = {
+                "last_load_time": timestamp,
+                "last_load_pid": os.getpid(),
+                "last_load_datetime": DateHelper.now().isoformat()
+            }
+            assert isinstance(PowerControllerViewer._cache_metadata_file, Path)
+            with PowerControllerViewer._cache_metadata_file.open("w") as f:
+                json.dump(metadata, f)
+        except (OSError, json.JSONDecodeError) as e:
+            self.logger.log_message(f"Error updating cache metadata: {e!s}", "warning")
+
+    def _load_state_files_internal(self):
+        """Internal method that does the actual file loading and chart generation."""
+        # Acquire both locks to ensure exclusive access for loading and chart generation
+        with PowerControllerViewer._state_lock, PowerControllerViewer._chart_generation_lock:  # noqa: PLR1702
+            # Initialize the state list
+            temp_state_items = []
+
+            if self.state_data_dir.exists() and self.state_data_dir.is_dir():
+                json_files = sorted([f.name for f in self.state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")])
+
+                # Show a warning if we have no state data
+                if not json_files:
+                    self.logger.log_message(f"No JSON files found in {self.state_data_dir}.", "warning")
+
+                for idx, file_name in enumerate(json_files):
+                    if file_name.startswith("."):
+                        # Skip hidden files
+                        continue
+
+                    file_path = Path(self.state_data_dir) / file_name
+
+                    self.logger.log_message(f"Attempting to load state file: {file_path}.", "debug")
+
+                    try:
+                        state_item = self._safe_read_json(file_path)
+
+                        if state_item is not None:
+                            # Decode any datatype hints - all file types now
+                            state_item = JSONEncoder.decode_object(state_item)
+                            assert isinstance(state_item, dict), "Decoded data is not a dictionary."
+
+                            last_save_time = None
+                            state_file_type = state_item.get("StateFileType")
+                            if state_file_type == "LightingControl":
+                                last_save_time = state_item.get("LastStateSaveTime")
+                                device_description = "Lighting Controller"
+                            elif state_file_type == "PowerController":
+                                last_save_time = state_item.get("SaveTime")
+                                device_description = "Power Controller"
+                            elif state_file_type == "TempProbes":
+                                last_save_time = state_item.get("SaveTime")
+                                device_description = "Temperature Probes"
+                            else:
+                                device_description = "Unknown Device"
+
+                            if last_save_time is None:
+                                last_save_time = DateHelper.now()
+
+                            # Convert the last_save_time to the local timezone
+                            if isinstance(last_save_time, dt.datetime):
+                                last_save_time = last_save_time.astimezone()
+
+                            # Update the latest save timestamp if needed
+                            if (PowerControllerViewer._state_latest_save_timestamp is None or last_save_time > PowerControllerViewer._state_latest_save_timestamp):
+                                self.logger.log_message(f"Updating latest state save timestamp to {last_save_time} for {file_path}.", "debug")
+                                PowerControllerViewer._state_latest_save_timestamp = last_save_time
+
+                            # record the last save time and device description
+                            state_item["LocalLastSaveTime"] = last_save_time
+                            state_item["DeviceDescription"] = device_description
+
+                            if state_file_type == "TempProbes":
+                                # Generate any required temp probe charts
+                                self._generate_state_data_charts(idx, state_item)
+
+                            temp_state_items.append(state_item)
+                            self.logger.log_message(f"Successfully loaded state item {idx + 1} from {file_path}.", "debug")
+                        else:
+                            self.logger.log_message(f"Skipped empty or unreadable file: {file_path}.", "warning")
+
+                    except (OSError, json.JSONDecodeError) as e:
+                        self.report_fatal_error(f"Error loading JSON from {file_path}: {e}")
+
+                self.logger.log_message(f"Loaded {len(temp_state_items)} state items from {self.state_data_dir}.", "debug")
+
+            # Update both instance and class-level cache atomically
+            self.state_items = temp_state_items
+            PowerControllerViewer._state_cache = temp_state_items.copy()
+            PowerControllerViewer._state_cache_timestamp = DateHelper.now()
+
+    def _state_loader_worker(self):
+        """Background worker thread that monitors and reloads state files."""
+        check_interval = 5  # Check every 5 seconds
+
+        while not PowerControllerViewer._worker_stop_event.is_set():
+            try:
+                if self.check_for_state_file_changes():
+                    # Check if another process recently loaded (within last 10 seconds)
+                    cache_meta = self._get_cache_metadata()
+                    if cache_meta:
+                        last_load_time = cache_meta.get("last_load_time", 0)
+                        last_load_pid = cache_meta.get("last_load_pid")
+                        time_since_load = time.time() - last_load_time
+
+                        if time_since_load < 10 and last_load_pid != os.getpid():
+                            self.logger.log_message(
+                                f"Worker (PID {os.getpid()}) skipping reload - process {last_load_pid} "
+                                f"loaded {time_since_load:.1f}s ago",
+                                "debug"
+                            )
+                            # Wait a bit longer before next check
+                            PowerControllerViewer._worker_stop_event.wait(2)
+                            continue
+
+                    # Try to acquire lock
+                    lock_acquired = False
+                    lock_file = None
+                    try:
+                        assert isinstance(PowerControllerViewer._reload_lock_file, Path)
+                        lock_file = PowerControllerViewer._reload_lock_file.open("w")
+                        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        lock_acquired = True
+
+                        self.logger.log_message(
+                            f"Worker (PID {os.getpid()}) acquired reload lock, reloading state...",
+                            "debug"
+                        )
+                        self._load_state_files_internal()
+                        self._update_cache_metadata(time.time())
+
+                    except BlockingIOError:
+                        self.logger.log_message(
+                            f"Worker (PID {os.getpid()}) detected reload in progress by another process",
+                            "debug"
+                        )
+                        time.sleep(2)
+
+                    finally:
+                        if lock_acquired and lock_file:
+                            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+                            lock_file.close()
+
+            except (OSError, json.JSONDecodeError, RuntimeError, ValueError, TypeError) as e:
+                self.logger.log_message(f"Error in state loader worker: {e!s}", "error")
+
+            # Wait for the specified interval or until stop event is set
+            PowerControllerViewer._worker_stop_event.wait(check_interval)
+
     def _safe_read_json(self, file_path: Path, max_retries: int = 3, retry_delay: float = 0.1):
         """Safely read JSON file with locking and retries.
 

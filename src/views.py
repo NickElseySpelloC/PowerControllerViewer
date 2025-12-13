@@ -45,7 +45,7 @@ def validate_access_key(args: MultiDict[str, str]) -> bool:
 
 
 @views.route("/")
-def home():  # noqa: PLR0912, PLR0915
+def home():
     """Render the homepage which shows a list of all the available states.
 
     Returns:
@@ -75,23 +75,16 @@ def home():  # noqa: PLR0912, PLR0915
             "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
             "CurrentIndex": state_idx,
             "TimeNow": DateHelper.now_str(),
+            "LastStateUpdate": helper.format_date_with_ordinal(helper.get_latest_state_modification_time(), True),
+            "LastStateReload": helper.format_date_with_ordinal(helper.get_last_state_reload(), True),
             "Devices": [],
     }
 
     # Now loop through the state_items and build the home page data
     for state_idx, _ in enumerate(helper.state_items):
         state_file_type = helper.get_state(state_idx, "StateFileType", default="PowerController")
-        device_description = "Unknown"
-        last_save_time = DateHelper.now()
-        if state_file_type == "LightingControl":
-            last_save_time = helper.get_state(state_idx, "LastStateSaveTime", default=DateHelper.now())
-            device_description = "Lighting Controller"
-        elif state_file_type == "PowerController":
-            last_save_time = helper.get_state(state_idx, "SaveTime", default=DateHelper.now())
-            device_description = "Power Controller"
-        elif state_file_type == "TempProbes":
-            last_save_time = helper.get_state(state_idx, "SaveTime", default=DateHelper.now())
-            device_description = "Temperature Probes"
+        last_save_time = helper.get_state(state_idx, "LocalLastSaveTime")
+        device_description = helper.get_state(state_idx, "DeviceDescription")
 
         device = {
             "StateIndex": state_idx,
