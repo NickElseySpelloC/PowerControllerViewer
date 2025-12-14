@@ -415,10 +415,19 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
         # Build a summary of the temp probes
         temp_probe_summary = []
         for probe in probe_data:
+            temp = probe.get("Temperature")
+            has_temp = temp is not None
+
+            # Split temperature into integer and decimal parts for display
+            temp_integer = int(temp) if has_temp else 0
+            temp_decimal = int((temp - temp_integer) * 10) if has_temp else 0
+
             entry = {
                 "Name": probe.get("Name", "Unknown"),
-                "HaveTemperature": probe.get("Temperature") is not None,
-                "Temperature": probe.get("Temperature") if probe.get("Temperature") is not None else "N/A",
+                "HaveTemperature": has_temp,
+                "Temperature": temp if has_temp else "N/A",
+                "TemperatureInteger": temp_integer,
+                "TemperatureDecimal": temp_decimal,
                 "LastLoggedTime": probe.get("LastLoggedTime").strftime("%H:%M") if isinstance(probe.get("LastLoggedTime"), dt.datetime) else "Unknown",
             }
             temp_probe_summary.append(entry)

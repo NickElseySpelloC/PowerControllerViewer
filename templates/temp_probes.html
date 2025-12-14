@@ -32,8 +32,9 @@
                         {% for device in page_data['TempProbes'] %}
                             {% if device['HaveTemperature'] %}
                                 <td class="info_td"> 
-                                    <span class="info_text_temp">{{ device['Temperature'] }}</span>
-                                    <span class="info_text_temp_unit">&nbsp;°C</span>
+                                    <span class="info_text_temp">{{ device['TemperatureInteger'] }}</span>
+                                    <span class="info_text_temp_decimal">.{{ device['TemperatureDecimal'] }}</span>
+                                    <span class="info_text_temp_unit">°C</span>
                                 </td>
                             {% else %}
                                 <td class="info_td"> 

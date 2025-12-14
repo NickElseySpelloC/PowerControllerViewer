@@ -156,8 +156,17 @@ table table th, table table td {
     text-align: center;
 }
 
+.info_text_temp_decimal {
+    font-size: 3.5vw;
+    font-size: clamp(1.0rem, 3.5vw, 10.0rem);
+    text-align: center;
+}
+
 @media (max-width: 480px) {
     .info_text_temp {
+        font-size: 1.5rem;
+    }
+    .info_text_temp_decimal {
         font-size: 1.0rem;
     }
 }
@@ -165,6 +174,9 @@ table table th, table table td {
 @media (min-width: 2285px) {
     .info_text_temp {
         font-size: 16.0rem;
+    }
+    .info_text_temp_decimal {
+        font-size: 10.0rem;
     }
 }
 
