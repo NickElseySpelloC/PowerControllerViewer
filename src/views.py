@@ -64,7 +64,7 @@ def home():
         return "Access forbidden.", 403
 
     # Deal with empty state_items array
-    state_idx, _ = helper.validate_state_index(0)
+    state_idx, _ = helper.validate_state_index(requested_state_idx=0)
     if state_idx is None:
         # Render the template with the summary data
         logger.log_message("Home: No states available.", "debug")
@@ -93,7 +93,7 @@ def home():
             "DeviceDescription": device_description,
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
             "IsDeviceRunning": None,
-            "Status": None
+            "Status": None,
         }
         # Figure out the IsDeviceRunning and Status
         if state_file_type == "LightingControl":
@@ -152,8 +152,7 @@ def summary():
         return "Access forbidden.", 403
 
     # Set the state index based on the query parameter
-    requested_state_idx = args.get("state_idx", default=None, type=int)
-    state_idx, state_next_idx = helper.validate_state_index(requested_state_idx)
+    state_idx, state_next_idx = helper.validate_state_index(url_args=args)
 
     # Deal with empty state_items array
     if state_idx is None:
@@ -422,13 +421,21 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
             temp_integer = int(temp) if has_temp else 0
             temp_decimal = int((temp - temp_integer) * 10) if has_temp else 0
 
+            # Get last updated time
+            if isinstance(probe.get("LastReadingTime"), dt.datetime):
+                last_reading_str = probe.get("LastReadingTime").strftime("%H:%M")
+            elif isinstance(probe.get("LastLoggedTime"), dt.datetime):
+                last_reading_str = probe.get("LastLoggedTime").strftime("%H:%M")
+            else:
+                last_reading_str = "Unknown"
+
             entry = {
                 "Name": probe.get("Name", "Unknown"),
                 "HaveTemperature": has_temp,
                 "Temperature": temp if has_temp else "N/A",
                 "TemperatureInteger": temp_integer,
                 "TemperatureDecimal": temp_decimal,
-                "LastLoggedTime": probe.get("LastLoggedTime").strftime("%H:%M") if isinstance(probe.get("LastLoggedTime"), dt.datetime) else "Unknown",
+                "LastReadingTime": last_reading_str,
             }
             temp_probe_summary.append(entry)
 

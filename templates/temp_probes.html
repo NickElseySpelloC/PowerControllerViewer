@@ -22,7 +22,7 @@
                             <td class="info_td"> 
                                 <span class="info_text_name">{{ device['Name'] }}</span>
                                 {% if device['HaveTemperature'] %}
-                                    <span class="info_text_time"> ({{ device['LastLoggedTime'] }})</span>
+                                    <span class="info_text_time"> ({{ device['LastReadingTime'] }})</span>
                                 {% endif %}
                             </td>
                         {% endfor %}

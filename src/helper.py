@@ -11,9 +11,11 @@ import traceback
 from html import escape
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import matplotlib as mpl
 from sc_utility import DateHelper, JSONEncoder, SCCommon, SCConfigManager, SCLogger
+from werkzeug.datastructures import MultiDict
 
 mpl.use("Agg")  # Use non-interactive backend for server environments
 from collections import defaultdict
@@ -145,10 +147,11 @@ class PowerControllerViewer:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
                 lock_file.close()
 
-    def validate_state_index(self, requested_state_idx: int | None = None) -> tuple[int | None, int | None]:
+    def validate_state_index(self, url_args: MultiDict[str, str] | None = None, requested_state_idx: int | None = None) -> tuple[int | None, int | None]:
         """Validate that a requested state index is within the valid range.
 
         Args:
+            url_args (MultDict[str, str], optional): The URL arguments to extract the state index from. If provided, it takes precedence over requested_state_idx.
             requested_state_idx (int, optional): The requested state index to use. If None, the first available state will be returned.
 
         Returns:
@@ -158,6 +161,23 @@ class PowerControllerViewer:
         max_state_idx = len(self.state_items) - 1
         if len(self.state_items) == 0:
             return None, None
+
+        if url_args is not None:
+            requested_state_idx = url_args.get("state_idx", default=None, type=int)
+            if requested_state_idx is None:
+                # If a state_idx wasn't provided in the URL, see if they passed a state_name
+                requested_state_name = url_args.get("state_name", default=None, type=str)
+                if requested_state_name is not None:
+                    # Find the state index with the matching device name
+                    for idx, state_item in enumerate(self.state_items):
+                        device_name = state_item.get("StateURLName")
+                        if device_name == requested_state_name:
+                            requested_state_idx = idx
+                            break
+
+                    if requested_state_idx is None:
+                        self.logger.log_message(f"State name '{requested_state_name}' not found, defaulting to first state.", "error")
+                        requested_state_idx = 0
 
         # Set the actual state index based on the requested one
         if requested_state_idx is None:
@@ -507,6 +527,22 @@ class PowerControllerViewer:
         """
         return PowerControllerViewer._state_latest_save_timestamp
 
+    @staticmethod
+    def url_encode_device_name(device_name: str) -> str:
+        r"""URL-encode a device name for safe inclusion in URLs.
+
+        First removed the following characters: space  /  \  - and encodes the rest.
+
+        Args:
+            device_name (str): The device name to encode.
+
+        Returns:
+            str: The URL-encoded device name.
+        """
+        # Strip unwanted characters and URL-encode the rest
+        stripped_name = device_name.replace(" ", "").replace("/", "").replace("\\", "").replace("-", "")
+        return quote(stripped_name)
+
     # ============ PRIVATE FUNCTIONS ========================================================================
 
     def _get_cache_metadata(self):  # noqa: PLR6301
@@ -538,7 +574,7 @@ class PowerControllerViewer:
         except (OSError, json.JSONDecodeError) as e:
             self.logger.log_message(f"Error updating cache metadata: {e!s}", "warning")
 
-    def _load_state_files_internal(self):
+    def _load_state_files_internal(self):  # noqa: PLR0915
         """Internal method that does the actual file loading and chart generation."""
         # Acquire both locks to ensure exclusive access for loading and chart generation
         with PowerControllerViewer._state_lock, PowerControllerViewer._chart_generation_lock:  # noqa: PLR1702
@@ -598,6 +634,7 @@ class PowerControllerViewer:
                             # record the last save time and device description
                             state_item["LocalLastSaveTime"] = last_save_time
                             state_item["DeviceDescription"] = device_description
+                            state_item["StateURLName"] = self.url_encode_device_name(state_item.get("DeviceName", f"Device{idx + 1}"))
 
                             if state_file_type == "TempProbes":
                                 # Generate any required temp probe charts
