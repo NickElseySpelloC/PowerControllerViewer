@@ -825,6 +825,7 @@ class PowerControllerViewer:
 
         # If the state item is temp probe data, generate the temp probe charts now
         probe_history = state_item.get("TempProbeLogging", {}).get("history", []) or []
+        probe_config = state_item.get("TempProbeLogging", {}).get("probes", []) or []
         if not probe_history or "TempProbeLogging" not in state_item or not state_item.get("Charting", {}).get("Enable"):
             return
 
@@ -835,13 +836,26 @@ class PowerControllerViewer:
         for config_idx, chart_config in enumerate(charting_config):
             chart_name = chart_config.get("Name", f"Chart {state_name}-{config_idx}")
             chart_file_name = f"Chart_{state_name}-{config_idx}.jpg"
-            probe_names = chart_config.get("Probes", [])
             days_to_show = chart_config.get("DaysToShow", 7)
+
+            # Issue 14: probe_names are now a list of string pairs - the probe name and display name
+            probe_names = []
+            for probe in chart_config.get("Probes", []):
+                display_name = probe
+                for probe_cfg in probe_config:
+                    if probe_cfg["Name"] == probe:
+                        display_name = probe_cfg.get("DisplayName", probe)
+                        break
+                probe_name_entry = {
+                    "Name": probe,
+                    "DisplayName": display_name
+                }
+                probe_names.append(probe_name_entry)
 
             if self._generate_temp_probe_chart(probe_history, chart_file_name, chart_name=chart_name, probe_names=probe_names, days_to_show=days_to_show, chart_count=chart_count):
                 state_item["TempProbeCharts"].append(chart_file_name)
 
-    def _generate_temp_probe_chart(self, probe_data: list[dict], file_name: str, chart_name: str | None = None, probe_names: list[str] | None = None, days_to_show: int | None = None, chart_count: int = 0) -> bool:  # noqa: PLR0912, PLR0914, PLR0915
+    def _generate_temp_probe_chart(self, probe_data: list[dict], file_name: str, chart_name: str | None = None, probe_names: list[dict] | None = None, days_to_show: int | None = None, chart_count: int = 0) -> bool:  # noqa: PLR0912, PLR0914, PLR0915
         """Generate a temperature probe chart from the provided probe data.
 
         Args:
@@ -849,7 +863,7 @@ class PowerControllerViewer:
                                      'Timestamp', 'ProbeName', and 'Temperature' keys.
             file_name (str): The file name to use for the generated chart image.
             chart_name (str | None): Optional name for the chart.
-            probe_names (list[str] | None): Optional list of probe names to include in the chart. If None, all probes are included.
+            probe_names (list[dict] | None): Optional list of probe name dicts to include in the chart. If None, all probes are included.
             days_to_show (int | None): Optional number of days to show in the chart. If None, all data is shown.
             chart_count (int): Optional total number of charts being generated (for scaling purposes). Use 0 for default.
 
@@ -875,7 +889,7 @@ class PowerControllerViewer:
                 temperature = entry.get("Temperature")
 
                 if (probe_name  # noqa: PLR0916
-                    and (probe_name in probe_names or not probe_names)
+                    and (not probe_names or any(probe["Name"] == probe_name for probe in probe_names))
                     and timestamp and (not earlist_time or timestamp >= earlist_time)
                     and temperature is not None):
                     probe_series[probe_name]["timestamps"].append(timestamp)
@@ -909,11 +923,19 @@ class PowerControllerViewer:
                 timestamps = data["timestamps"]
                 temperatures = data["temperatures"]
 
+                # Find matching probe entry to get DisplayName
+                display_name = probe_name
+                if probe_names:
+                    for probe_entry in probe_names:
+                        if probe_entry.get("Name") == probe_name:
+                            display_name = probe_entry.get("DisplayName", probe_name)
+                            break
+
                 if len(timestamps) <= 1:
                     # Single point or no data
                     ax.plot(timestamps, temperatures,
                            marker="o", linestyle="", markersize=4,
-                           label=probe_name)
+                           label=display_name)
                 else:
                     # Find gaps larger than 24 hours
                     segments_x = []
@@ -942,7 +964,7 @@ class PowerControllerViewer:
 
                     # Plot each segment separately
                     for j, (seg_x, seg_y) in enumerate(zip(segments_x, segments_y, strict=False)):
-                        label_name = probe_name if j == 0 else None  # Only label first segment
+                        label_name = display_name if j == 0 else None  # Only label first segment
                         ax.plot(seg_x,
                                 seg_y,
                                 marker="o",

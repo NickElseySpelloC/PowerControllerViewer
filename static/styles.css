@@ -113,10 +113,10 @@ table table th, table table td {
 }
 
 .info_text_name {
-    font-size: 2.5vw; /* Fallback for older browsers */
+    font-size: 4.0vw; /* Fallback for older browsers */
     font-size: clamp(1rem, 2.5vw, 6rem);
     text-align: center;
-    color: gray;
+    color: blue;
 }
 
 /* For iOS 12 and older browsers, use media queries */
@@ -133,9 +133,9 @@ table table th, table table td {
 }
 
 .info_text_time {
-    font-size: 0.9vw;
+    font-size: 2.5vw;
     font-size: clamp(0.7rem, 0.9vw, 1.2rem);
-    color: gray;
+    color: rgb(41, 39, 39);
 }
 
 @media (max-width: 480px) {
@@ -151,13 +151,13 @@ table table th, table table td {
 }
 
 .info_text_temp {
-    font-size: 7.0vw;
+    font-size: 12.0vw;
     font-size: clamp(1.0rem, 7.0vw, 16.0rem);
     text-align: center;
 }
 
 .info_text_temp_decimal {
-    font-size: 3.5vw;
+    font-size: 6.0vw;
     font-size: clamp(1.0rem, 3.5vw, 10.0rem);
     text-align: center;
 }

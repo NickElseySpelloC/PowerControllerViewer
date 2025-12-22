@@ -430,7 +430,7 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
                 last_reading_str = "Unknown"
 
             entry = {
-                "Name": probe.get("Name", "Unknown"),
+                "Name": probe.get("DisplayName", probe.get("Name", "Unknown")),
                 "HaveTemperature": has_temp,
                 "Temperature": temp if has_temp else "N/A",
                 "TemperatureInteger": temp_integer,

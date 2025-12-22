@@ -16,7 +16,8 @@ build/
 dist/
 venv/
 wheels/
-uv.lock
+.env
+.cache_ggshield
 
 # App 
 archive/
