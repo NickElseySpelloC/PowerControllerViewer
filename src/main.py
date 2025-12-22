@@ -137,6 +137,8 @@ def create_app():
         print(f"Logger initialisation error: {e}", file=sys.stderr)
         sys.exit(1)     # Exit with errorcode 1 so that launch.sh can detect it
 
+    logger.log_message("\n\nStarting the PowerController web application", "summary")
+
     # Setup email
     logger.register_email_settings(config.get_email_settings())
 
@@ -161,7 +163,8 @@ def main_loop():
     hosting_port = config.get("Website", "Port", default=8000)
     debug_mode = config.get("Website", "DebugMode", default=False) or False
 
-    logger.log_message(f"Starting the PowerController web application on {hosting_ip}:{hosting_port}", "summary")
+    logger.log_message(f"PowerController web application running on {hosting_ip}:{hosting_port}", "detailed")
+
     try:
         app.run(debug=debug_mode, host=hosting_ip, port=hosting_port)  # type: ignore[call-arg]
     except KeyboardInterrupt:
