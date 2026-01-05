@@ -102,14 +102,28 @@ table table th, table table td {
     border: none;
     width: 100%;
     text-align: center;
+    margin: 0px;
+    padding: 0px;
 }
 
+.output_table {
+    border: none;
+    /* width: 100%; */
+    text-align: left;
+    margin: 0px;
+}
 /* Table element styles for the desktop temp probe display */
 
+.info_tr {
+    margin: 0px;
+    padding: 0px;
+}
 .info_td {
     vertical-align: middle;
     text-align: center;
     border: none;
+    margin: 0px;
+    padding: 0px;
 }
 
 .info_td_left {

@@ -17,7 +17,7 @@
             <!-- Table for full width display -->
             <table class="info_table full">
                 <tbody>
-                    <tr>
+                    <tr class="info_tr">
                         {% for device in page_data['TempProbes'] %}
                             <td class="info_td"> 
                                 <span class="info_text_name">{{ device['Name'] }}</span>
@@ -28,7 +28,7 @@
                         {% endfor %}
                     </tr>
 
-                    <tr>
+                    <tr class="info_tr">
                         {% for device in page_data['TempProbes'] %}
                             {% if device['HaveTemperature'] %}
                                 <td class="info_td"> 
@@ -46,7 +46,7 @@
                     <!-- Display each temp probe chart (if any) -->
                     {% if page_data['TempProbeCharts'] %}
                         {% for chart in page_data['TempProbeCharts'] %}
-                            <tr>
+                            <tr class="info_tr">
                                 <td class="info_td_chart" colspan="{{ page_data['TempProbes']|length }}">
                                     <img 
                                         src="{{ url_for('static', filename=chart) }}" 
@@ -61,7 +61,7 @@
             </table>
 
             <!-- Display the current state of each Shelly output device -->
-            <table >
+            <table class="output_table">
                 <tbody>
                     {% if page_data['ShellyDevices'] %}
                         <tr>
