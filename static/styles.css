@@ -112,6 +112,18 @@ table table th, table table td {
     border: none;
 }
 
+.info_td_left {
+    vertical-align: middle;
+    text-align: left;
+    border: none;
+}
+
+.info_td_right {
+    vertical-align: middle;
+    text-align: right;
+    border: none;
+}
+
 .info_text_name {
     font-size: 4.0vw; /* Fallback for older browsers */
     font-size: clamp(1rem, 2.5vw, 6rem);

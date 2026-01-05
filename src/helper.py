@@ -376,7 +376,7 @@ class PowerControllerViewer:
         return f"{neg_symbol}{hours_part}:{minutes:02}"
 
     @staticmethod
-    def format_date_with_ordinal(date: dt.date, show_time: bool | None = False):  # noqa: FBT001, FBT002
+    def format_date_with_ordinal(date: dt.date, show_time: bool | None = False):
         """Format a date with an ordinal suffix for the day - for example 14th April.
 
         Args:
@@ -401,7 +401,7 @@ class PowerControllerViewer:
             return_str += time_str
         return return_str
 
-    def report_fatal_error(self, message, report_stack=False, calling_function=None) -> str:  # noqa: FBT002
+    def report_fatal_error(self, message, report_stack=False, calling_function=None) -> str:
         """Report a fatal error and exit the program.
 
         Args:
@@ -574,7 +574,7 @@ class PowerControllerViewer:
         except (OSError, json.JSONDecodeError) as e:
             self.logger.log_message(f"Error updating cache metadata: {e!s}", "warning")
 
-    def _load_state_files_internal(self):  # noqa: PLR0915
+    def _load_state_files_internal(self):  # noqa: PLR0912, PLR0915
         """Internal method that does the actual file loading and chart generation."""
         # Acquire both locks to ensure exclusive access for loading and chart generation
         with PowerControllerViewer._state_lock, PowerControllerViewer._chart_generation_lock:  # noqa: PLR1702
@@ -612,7 +612,12 @@ class PowerControllerViewer:
                                 device_description = "Lighting Controller"
                             elif state_file_type == "PowerController":
                                 last_save_time = state_item.get("SaveTime")
-                                device_description = "Power Controller"
+                                if state_item.get("Output", {}).get("Type") == "teslamate":
+                                    device_description = "Tesla Charging"
+                                elif state_item.get("Output", {}).get("Type") == "meter":
+                                    device_description = "Energy Meter"
+                                else:
+                                    device_description = "Power Controller"
                             elif state_file_type == "TempProbes":
                                 last_save_time = state_item.get("SaveTime")
                                 device_description = "Temperature Probes"
@@ -790,7 +795,7 @@ class PowerControllerViewer:
         """Allows setting values in the state dictionary using square brackets."""
         self.state_items[index] = value
 
-    def _generate_state_data_charts(self, state_idx: int, state_item: dict):
+    def _generate_state_data_charts(self, state_idx: int, state_item: dict):  # noqa: PLR0914
         """Generate any required state data charts.
 
         Generates the required charts for the provided state item and saves them to the static directory.
@@ -842,13 +847,16 @@ class PowerControllerViewer:
             probe_names = []
             for probe in chart_config.get("Probes", []):
                 display_name = probe
+                colour = None
                 for probe_cfg in probe_config:
                     if probe_cfg["Name"] == probe:
                         display_name = probe_cfg.get("DisplayName", probe)
+                        colour = probe_cfg.get("Colour")
                         break
                 probe_name_entry = {
                     "Name": probe,
-                    "DisplayName": display_name
+                    "DisplayName": display_name,
+                    "Colour": colour,
                 }
                 probe_names.append(probe_name_entry)
 
@@ -925,10 +933,12 @@ class PowerControllerViewer:
 
                 # Find matching probe entry to get DisplayName
                 display_name = probe_name
+                line_colour = probe_colors[probe_name]
                 if probe_names:
                     for probe_entry in probe_names:
                         if probe_entry.get("Name") == probe_name:
                             display_name = probe_entry.get("DisplayName", probe_name)
+                            line_colour = probe_entry.get("Colour", probe_colors[probe_name])
                             break
 
                 if len(timestamps) <= 1:
@@ -972,7 +982,7 @@ class PowerControllerViewer:
                                 linewidth=2,
                                 markersize=4,
                                 label=label_name,
-                                color=probe_colors[probe_name])
+                                color=line_colour)
 
             # Configure axes
             # ax.set_xlabel("Date", fontsize=12)

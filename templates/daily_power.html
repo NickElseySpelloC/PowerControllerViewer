@@ -50,14 +50,16 @@
                     <td>Date</td><td>{{ page_data['Date'] }}</td>
                 </tr>
                 <tr>
-                    <td>Shortfall Carried Over</td><td>{{ page_data['Shortfall'] }} hours</td>
-                </tr>
-                <tr>
-                    <td>Target Runtime</td><td>{{ page_data['TargetRuntime'] }} hours</td>
-                </tr>
-                <tr>
                     <td>Actual Runtime</td><td>{{ page_data['ActualRuntime'] }}</td>
                 </tr>
+                {% if page_data['ShowPlannedRuntime']  %}
+                    <tr>
+                        <td>Shortfall Carried Over</td><td>{{ page_data['Shortfall'] }} hours</td>
+                    </tr>
+                    <tr>
+                        <td>Target Runtime</td><td>{{ page_data['TargetRuntime'] }} hours</td>
+                    </tr>
+                {% endif %}
                 <tr>
                     <td>Energy Usage</td><td>{{ page_data['EnergyUsed'] }}</td>                    
                 </tr>

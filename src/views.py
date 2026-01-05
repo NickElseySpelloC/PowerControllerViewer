@@ -45,7 +45,7 @@ def validate_access_key(args: MultiDict[str, str]) -> bool:
 
 
 @views.route("/")
-def home():
+def home():  # noqa: PLR0912
     """Render the homepage which shows a list of all the available states.
 
     Returns:
@@ -107,18 +107,26 @@ def home():
                     on_count += 1
             device["Status"] = f"{on_count} lights are on"
         elif state_file_type == "PowerController":
-            # Device is running if any light is on
             device["IsDeviceRunning"] = helper.get_state(state_idx, "Output", "IsOn", default=False)
-            remaining_runtime = helper.hours_to_string(helper.get_state(state_idx, "Output", "RunPlan", "RemainingHours", default=0))
-            pump_start_time = None
-            if device["IsDeviceRunning"]:
-                pump_start_time = helper.get_state(state_idx, "Output", "RunHistory", "LastStartTime", default=None)
-                if pump_start_time:
-                    device["Status"] = f"On at {(pump_start_time.strftime("%H:%M") if pump_start_time else "Unknown")}, {remaining_runtime} remaining today."
+            if helper.get_state(state_idx, "Output", "Type", default="") == "shelly":
+                # Fully support Shelly switched devices
+                remaining_runtime = helper.hours_to_string(helper.get_state(state_idx, "Output", "RunPlan", "RemainingHours", default=0))
+                output_start_time = None
+                if device["IsDeviceRunning"]:
+                    output_start_time = helper.get_state(state_idx, "Output", "RunHistory", "LastStartTime", default=None)
+                    if output_start_time:
+                        device["Status"] = f"On at {(output_start_time.strftime("%H:%M") if output_start_time else "Unknown")}, {remaining_runtime} remaining today."
+                    else:
+                        device["Status"] = f"On, {remaining_runtime} remaining today."
                 else:
-                    device["Status"] = f"On, {remaining_runtime} remaining today."
-            else:
-                device["Status"] = f"Not running, {remaining_runtime} remaining today."
+                    device["Status"] = f"Not running, {remaining_runtime} remaining today."
+            else:  # noqa: PLR5501
+                # A meter or TeslaMate device
+                if device["IsDeviceRunning"]:
+                    output_start_time = helper.get_state(state_idx, "Output", "RunHistory", "LastStartTime", default=None)
+                    device["Status"] = f"On at {(output_start_time.strftime("%H:%M"))}." if output_start_time else "On."
+                else:
+                    device["Status"] = "Off."
         elif state_file_type == "TempProbes":
             temp_probes = helper.get_state(state_idx, "TempProbeLogging", "probes", default=[])
             device["Status"] = f"{len(temp_probes)} probes active."
@@ -232,9 +240,9 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
         last_save_time = state_data.get("LocalLastSaveTime", DateHelper.now())
         logger.log_message(f"Home: rendering device {state_data.get('DeviceName')} of type PowerController for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]
 
-        pump_start_time = None
+        output_start_time = None
         if output_data.get("IsOn"):
-            pump_start_time = run_history.get("LastStartTime")
+            output_start_time = run_history.get("LastStartTime")
         average_hourly_usage = (run_history.get("AlltimeTotals", {}).get("HourlyEnergyUsed") or 0) / 1000
         average_daily_usage = average_hourly_usage * 24
         average_price = run_history.get("AlltimeTotals", {}).get("AveragePrice") or 0
@@ -247,6 +255,8 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
             actual_hours = run_history_today.get("ActualHours", 0) or 0
             target_hours = run_history_today.get("TargetHours")
             prior_shortfall = run_history_today.get("PriorShortfall", 0) or 0
+        if target_hours == -1:
+            target_hours = None
         if target_hours is None:
             planned_hours = None
         else:
@@ -278,7 +288,8 @@ def build_power_homepage(state_idx: int, state_next_idx: int | None, debug_messa
             "StatusMessage": output_data.get("Reason", "Unknown"),
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
             "IsDeviceRunning": output_data.get("IsOn", False),
-            "PumpStatus": "Not running" if not output_data.get("IsOn", False) else "Started at " + (pump_start_time.strftime("%H:%M:%S") if pump_start_time else "Unknown"),
+            "PumpStatus": "Not running" if not output_data.get("IsOn", False) else "Started at " + (output_start_time.strftime("%H:%M:%S") if output_start_time else "Unknown"),
+            "ShowPlannedRuntime": target_hours is not None,
             "TargetRuntime": "All" if target_hours is None else helper.hours_to_string(target_hours),
             "PriorShortfall": helper.hours_to_string(prior_shortfall),
             "PlannedRuntime": "All" if planned_hours is None else helper.hours_to_string(planned_hours),
@@ -451,7 +462,9 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
             "DebugMessage": debug_message,
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
             "TempProbes": temp_probe_summary,
+            "ShellyDevices": get_shelly_output_info(),
             "TempProbeCharts": state_data.get("TempProbeCharts"),
+            "CurrentTime": DateHelper.now().strftime("Time: %H:%M:%S"),
             }
     except KeyError as e:
         error_message = f"An error occurred while rendering a TempProbes summary page: {e}"
@@ -525,7 +538,7 @@ def day_detail():
         return helper.generate_html_page(e), 500
 
 
-def build_power_daily_data(state_idx: int, day: int, max_day: int) -> dict:  # noqa: PLR0914
+def build_power_daily_data(state_idx: int, day: int, max_day: int) -> dict:  # noqa: PLR0914, PLR0915
     """Build the daily data for a PowerController state file.
 
     Args:
@@ -569,6 +582,8 @@ def build_power_daily_data(state_idx: int, day: int, max_day: int) -> dict:  # n
         actual_hours = day_data.get("ActualHours", 0) or 0
         actual_runtime = helper.hours_to_string(actual_hours) + " hours run"
         remaining_hours = 0
+        if target_hours == -1:
+            target_hours = None
         if target_hours:
             remaining_hours = max(0, target_hours + prior_shortfall - actual_hours)
         if remaining_hours > 0.01666667:  # 1 minute
@@ -591,6 +606,7 @@ def build_power_daily_data(state_idx: int, day: int, max_day: int) -> dict:  # n
             "Date": (page_date.strftime("%d/%m/%Y") if page_date else "Unknown"),
             "DateLong": helper.format_date_with_ordinal(page_date),
             "Shortfall": helper.hours_to_string(prior_shortfall),
+            "ShowPlannedRuntime": target_hours is not None,
             "TargetRuntime": "All" if target_hours is None else helper.hours_to_string(target_hours or 0),
             "ActualRuntime": actual_runtime,
             "EnergyUsed": energy_usage,
@@ -793,3 +809,23 @@ def submit_data():
 
     # Display a success message
     return jsonify({"message": "Data received and validated successfully."}), 200
+
+
+def get_shelly_output_info() -> list[dict]:
+    """Get a list of Shelly device output information.
+
+    Returns:
+        list[dict]: A list of dictionaries containing Shelly device output information.
+    """
+    assert helper is not None, "Helper instance is not initialized."
+
+    shelly_devices = []
+    for state in helper.state_items:
+        assert isinstance(state, dict)
+        if state.get("StateFileType") == "PowerController" and state.get("Output", {}).get("Type") == "shelly":
+            shelly_info = {
+                "Name": state.get("DeviceName", "Unknown"),
+                "IsOn": state.get("Output", {}).get("IsOn", False),
+            }
+            shelly_devices.append(shelly_info)
+    return shelly_devices

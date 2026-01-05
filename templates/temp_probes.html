@@ -57,6 +57,28 @@
                             </tr>
                         {% endfor %}
                     {% endif %}
+                </tbody>
+            </table>
+
+            <!-- Display the current state of each Shelly output device -->
+            <table >
+                <tbody>
+                    {% if page_data['ShellyDevices'] %}
+                        <tr>
+                            {% for device in page_data['ShellyDevices'] %}
+                                <td class="info_td_right">
+                                    {{ device['Name'] }}
+                                </td>
+                                <td class="info_td_left">
+                                    {% if device['IsOn'] %} 
+                                        <span class="circle green-circle"></span>
+                                    {% else %}
+                                        <span class="circle black-circle"></span>
+                                    {% endif %}
+                                </td>                                
+                            {% endfor %}
+                        </tr>
+                    {% endif %}
             </tbody>
             </table>
 
@@ -99,6 +121,7 @@
             Go to {{ page_data['NextDeviceName'] }} >>>
             </a>
         {% endif %}
+        <span style="margin-left: 20px; font-size: 1.7rem">{{ page_data['CurrentTime'] }}</span>
     </div>    
     <div class="footer_text" style="margin-top: 10px;">
         Last updated {{ page_data['LastCheck'] }}
