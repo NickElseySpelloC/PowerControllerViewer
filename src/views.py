@@ -485,7 +485,7 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
         return summary_page_data
 
 
-def build_output_metering_homepage(state_idx: int, state_next_idx: int | None, debug_message: str | None = None):
+def build_output_metering_homepage(state_idx: int, state_next_idx: int | None, debug_message: str | None = None):  # noqa: PLR0915
     """Build the homepage for a OutputMeteru=ing state file.
 
     Args:
@@ -512,6 +512,46 @@ def build_output_metering_homepage(state_idx: int, state_next_idx: int | None, d
         assert isinstance(totals_data, list)
         meters_data = state_data.get("Meters", []) or []
         assert isinstance(meters_data, list)
+
+        for idx, period in enumerate(totals_data):
+            period["PeriodAndDate"] = period.get("Period") + f" (from {period.get('StartDate').strftime('%d %b')})"  # type: ignore[attr-defined]
+            have_global_data = period.get("HaveData")
+            if have_global_data:
+                global_energy_used = period.get("GlobalEnergyUsed", 0)
+                period["GlobalEnergyUsedStr"] = f"{global_energy_used:.1f} kWh"
+                global_cost = period.get("GlobalCost", 0)
+                period["GlobalCostStr"] = f"${global_cost:.2f}"
+
+                other_energy_used = period.get("OtherEnergyUsed", 0)
+                period["OtherEnergyUsedStr"] = f"{other_energy_used:.1f} kWh"
+                period["OtherEnergyUsedStr"] += f" ({(other_energy_used / global_energy_used * 100):.1f}%)" if global_energy_used > 0 else ""
+
+                other_cost = period.get("OtherCost", 0)
+                period["OtherCostStr"] = f"${other_cost:.2f}"
+                period["OtherCostStr"] += f" ({(other_cost / global_cost * 100):.1f}%)" if global_cost > 0 else ""
+            else:
+                period["GlobalEnergyUsedStr"] = "N/A"
+                period["GlobalCostStr"] = "N/A"
+                period["OtherEnergyUsedStr"] = "N/A"
+                period["OtherCostStr"] = "N/A"
+
+            # Now format the meter totals
+            for meter in meters_data:
+                meter_usage = meter.get("Usage", [])[idx]
+                if meter_usage.get("HaveData"):
+                    energy_used = meter_usage.get("EnergyUsed", 0)
+                    if energy_used > 0.1:
+                        meter_usage["EnergyUsedStr"] = f"{energy_used:.1f} kWh"
+                        meter_usage["EnergyUsedStr"] += f" ({meter_usage.get('EnergyUsedPcnt', 0):.1f}%)" if meter_usage.get("EnergyUsedPcnt") is not None else ""
+                        meter_usage["CostStr"] = f"${meter_usage.get('Cost', 0):.2f}"
+                        meter_usage["CostStr"] += f" ({meter_usage.get('CostPcnt', 0):.1f}%)" if meter_usage.get("CostPcnt") is not None else ""
+                    else:
+                        meter_usage["EnergyUsedStr"] = "-"
+                        meter_usage["CostStr"] = "-"
+
+                else:
+                    meter_usage["EnergyUsedStr"] = "N/A"
+                    meter_usage["CostStr"] = "N/A"
 
         last_save_time = state_data.get("LocalLastSaveTime", DateHelper.now())
         logger.log_message(f"Home: rendering device {state_data.get('DeviceName')} of type OutputMetering for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]

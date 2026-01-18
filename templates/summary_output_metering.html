@@ -13,7 +13,6 @@
 <body>
     <div>
         <h1>{{page_data['DeviceName']}}</h1>
-        <p>Status as at {{ page_data['TimeNow'] }}: {{ page_data['StatusMessage'] }}</p>
 
         <!-- Navigation Buttons -->
         <div>
@@ -34,7 +33,7 @@
                 <tr>    <!-- Add a row with the periods -->
                     <th rowspan="2">Metered Output</th>
                     {% for period in page_data['Totals'] %}
-                        <th colspan="2">{{ period['Period'] }}</th>
+                        <th colspan="2">{{ period['PeriodAndDate'] }}</th>
                     {% endfor %}
                 </tr>
                 <tr>    <!-- Add a row with the sub-headings -->
@@ -50,13 +49,29 @@
                     <tr>
                         <td>{{ meter['DisplayName'] }}</td>
                         {% for period in meter['Usage'] %}
-                            <td>{{ period['EnergyUsed'] / 1000 }}</td>
-                            <td>{{ period['Cost'] }}</td>
+                            <td>{{ period['EnergyUsedStr'] }}</td>
+                            <td>{{ period['CostStr'] }}</td>
                         {% endfor %}
                     </tr>
                 {% endfor %}
+                <!-- Row for Other usage  -->
+                <tr>
+                    <td>Unmetered Usage</td>
+                    {% for period in page_data['Totals'] %}
+                        <td>{{ period['OtherEnergyUsedStr'] }}</td>
+                        <td>{{ period['OtherCostStr'] }}</td>
+                    {% endfor %}
+                </tr>
+
+                <!-- Add total row -->
+                <tr>
+                    <th>Totals</th>
+                    {% for period in page_data['Totals'] %}
+                        <th>{{ period['GlobalEnergyUsedStr'] }}</th>
+                        <th>{{ period['GlobalCostStr'] }}</th>
+                    {% endfor %}
+                </tr>
             </tbody>
-            <!-- TO DO: Add total row -->
         </table>
         
     </div>
