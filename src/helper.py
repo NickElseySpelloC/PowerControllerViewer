@@ -621,6 +621,9 @@ class PowerControllerViewer:
                             elif state_file_type == "TempProbes":
                                 last_save_time = state_item.get("SaveTime")
                                 device_description = "Temperature Probes"
+                            elif state_file_type == "OutputMetering":
+                                last_save_time = state_item.get("SaveTime")
+                                device_description = "Metered Outputs"
                             else:
                                 device_description = "Unknown Device"
 

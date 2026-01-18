@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% if page_data['RefreshDelay'] > 0 %}
+        <meta http-equiv="refresh" content="{{page_data['RefreshDelay']}}">
+    {% endif %}
+    <title>{{page_data['DeviceName']}}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <div>
+        <h1>{{page_data['DeviceName']}}</h1>
+        <p>Status as at {{ page_data['TimeNow'] }}: {{ page_data['StatusMessage'] }}</p>
+
+        <!-- Navigation Buttons -->
+        <div>
+            <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
+               class="button">
+               Home
+            </a>
+            {% if page_data['NextIndex'] is not none %}
+                <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
+                class="button">
+                Go to {{ page_data['NextDeviceName'] }} >>>
+                </a>
+            {% endif %}
+        </div>
+
+        <table>
+            <thead>
+                <tr>    <!-- Add a row with the periods -->
+                    <th rowspan="2">Metered Output</th>
+                    {% for period in page_data['Totals'] %}
+                        <th colspan="2">{{ period['Period'] }}</th>
+                    {% endfor %}
+                </tr>
+                <tr>    <!-- Add a row with the sub-headings -->
+                    {% for period in page_data['Totals'] %}
+                        <th>Energy</th>
+                        <th>Cost</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                <!-- List the energy usage for each metered output -->
+                {% for meter in page_data['Meters'] %}
+                    <tr>
+                        <td>{{ meter['DisplayName'] }}</td>
+                        {% for period in meter['Usage'] %}
+                            <td>{{ period['EnergyUsed'] / 1000 }}</td>
+                            <td>{{ period['Cost'] }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <!-- TO DO: Add total row -->
+        </table>
+        
+    </div>
+    <script 
+        type="text/javascript" 
+        src="{{ url_for('static', filename='index.js') }}"
+    ></script>
+</body>
+</html>

@@ -45,7 +45,7 @@ def validate_access_key(args: MultiDict[str, str]) -> bool:
 
 
 @views.route("/")
-def home():  # noqa: PLR0912
+def home():  # noqa: PLR0912, PLR0915
     """Render the homepage which shows a list of all the available states.
 
     Returns:
@@ -130,6 +130,9 @@ def home():  # noqa: PLR0912
         elif state_file_type == "TempProbes":
             temp_probes = helper.get_state(state_idx, "TempProbeLogging", "probes", default=[])
             device["Status"] = f"{len(temp_probes)} probes active."
+        elif state_file_type == "OutputMetering":
+            outputs = helper.get_state(state_idx, "Meters", default=[])
+            device["Status"] = f"{len(outputs)} meters logged."
 
         home_page_data["Devices"].append(device)
     try:
@@ -199,6 +202,15 @@ def summary():
                 debug_message=debug_message,
             )
             return render_template("temp_probes.html", page_data=summary_page_data)
+
+        if state_type == "OutputMetering":
+            summary_page_data = build_output_metering_homepage(
+                state_idx=state_idx,
+                state_next_idx=state_next_idx,
+                debug_message=debug_message,
+            )
+            return render_template("summary_output_metering.html", page_data=summary_page_data)
+
         error_message = f"Unsupported state file type: {state_type}"
         logger.log_message(error_message, "error")
         return helper.generate_html_page(error_message), 500
@@ -473,6 +485,58 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
         return summary_page_data
 
 
+def build_output_metering_homepage(state_idx: int, state_next_idx: int | None, debug_message: str | None = None):
+    """Build the homepage for a OutputMeteru=ing state file.
+
+    Args:
+        state_idx (int): The index of the selected state which will be type PowerController.
+        state_next_idx (int): The index of the next state.
+        debug_message (str | None): Optional debug message to include in the response.
+
+    Returns:
+        dict: A dictionary containing the summary data for the homepage.
+
+    Raises:
+        KeyError: If a required key is missing in the state data.
+    """
+    assert config is not None, "Config instance is not initialized."
+    assert logger is not None, "Logger instance is not initialized."
+    assert helper is not None, "Helper instance is not initialized."
+
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "Unknown"
+
+    try:
+        state_data = helper.state_items[state_idx]
+        assert isinstance(state_data, dict)
+        totals_data = state_data.get("Totals", []) or []
+        assert isinstance(totals_data, list)
+        meters_data = state_data.get("Meters", []) or []
+        assert isinstance(meters_data, list)
+
+        last_save_time = state_data.get("LocalLastSaveTime", DateHelper.now())
+        logger.log_message(f"Home: rendering device {state_data.get('DeviceName')} of type OutputMetering for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]
+
+        # Build a dict object that we will use to pass the information to the web page
+        summary_page_data = {
+            "AccessKey": config.get("Website", "AccessKey"),
+            "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
+            "CurrentIndex": state_idx,
+            "DeviceName": state_data.get("DeviceName", "Unknown"),
+            "NextIndex": state_next_idx,
+            "NextDeviceName": helper.get_state(state_next_idx, "DeviceName", default="Unknown") if state_next_idx is not None else None,
+            "TimeNow": DateHelper.now_str(),
+            "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
+            "Totals": totals_data,
+            "Meters": meters_data,
+            "DebugMessage": debug_message,
+            }
+    except KeyError as e:
+        error_message = f"An error occurred while rendering a OutputMetering summary page: {e}"
+        raise KeyError(error_message) from e
+    else:
+        return summary_page_data
+
+
 @views.route("/daily")
 def day_detail():
     """
@@ -715,7 +779,7 @@ def build_lightingcontrol_daily_data(state_idx: int, day: int, max_day: int) -> 
 
 
 @views.route("/api/submit", methods=["POST"])
-def submit_data():
+def submit_data():  # noqa: PLR0912
     """Accept a JSON object via POST and validate it.
 
     Returns:
@@ -755,7 +819,7 @@ def submit_data():
     try:
         state_type = data.get("StateFileType", "PowerController")
         required_keys = {}
-        if state_type not in {"PowerController", "LightingControl", "TempProbes"}:
+        if state_type not in {"PowerController", "LightingControl", "TempProbes", "OutputMetering"}:
             logger.log_message(f"Submit Data: Invalid state type: {state_type}", "warning")
             return jsonify({"error": f"Invalid state file type: {state_type}"}), 400
 
@@ -785,6 +849,16 @@ def submit_data():
                 "SchemaVersion": int,
                 "DeviceName": str,
                 "TempProbeLogging": dict,
+                }
+
+        elif state_type == "OutputMetering":
+            # Check for some required required keys and their types
+            required_keys = {
+                "SaveTime": str,
+                "SchemaVersion": int,
+                "DeviceName": str,
+                "Totals": list,
+                "Meters": list,
                 }
 
         for key, expected_type in required_keys.items():
