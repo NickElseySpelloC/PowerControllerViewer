@@ -542,9 +542,9 @@ def build_output_metering_homepage(state_idx: int, state_next_idx: int | None, d
                     energy_used = meter_usage.get("EnergyUsed", 0)
                     if energy_used > 0.1:
                         meter_usage["EnergyUsedStr"] = f"{energy_used:.1f} kWh"
-                        meter_usage["EnergyUsedStr"] += f" ({meter_usage.get('EnergyUsedPcnt', 0):.1f}%)" if meter_usage.get("EnergyUsedPcnt") is not None else ""
+                        meter_usage["EnergyUsedStr"] += f" ({meter_usage.get('EnergyUsedPcnt', 0) * 100:.1f}%)" if meter_usage.get("EnergyUsedPcnt") is not None else ""
                         meter_usage["CostStr"] = f"${meter_usage.get('Cost', 0):.2f}"
-                        meter_usage["CostStr"] += f" ({meter_usage.get('CostPcnt', 0):.1f}%)" if meter_usage.get("CostPcnt") is not None else ""
+                        meter_usage["CostStr"] += f" ({meter_usage.get('CostPcnt', 0) * 100:.1f}%)" if meter_usage.get("CostPcnt") is not None else ""
                     else:
                         meter_usage["EnergyUsedStr"] = "-"
                         meter_usage["CostStr"] = "-"
