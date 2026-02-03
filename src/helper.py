@@ -34,7 +34,9 @@ class UsageReportingPeriod:
     name: str
     start_date: dt.date
     end_date: dt.date
+    is_custom: bool = False
     show: bool = False
+    menu: bool = not show
     have_global_data: bool = False
     global_energy_used: float = 0.0
     global_cost: float = 0.0
@@ -264,22 +266,32 @@ class PowerControllerViewer:
 
         return state_idx, day_idx, max_day_idx
 
-    @staticmethod
-    def validate_start_end_dates(url_args: MultiDict[str, str] | None) -> tuple[dt.date | None, dt.date | None]:
+    def validate_metering_args(self, requested_state_idx: int, url_args: MultiDict[str, str] | None) -> tuple[int | None, dt.date | None, dt.date | None]:
         """Validate and extract custom start and end dates from URL arguments.
 
         Args:
+            requested_state_idx (int): The index of the state item to validate against.
             url_args (MultiDict[str, str] | None): The URL arguments to extract the dates from.
 
         Returns:
-            tuple(dt.date | None, dt.date | None): The validated start and end dates, or None if not provided or invalid.
+            tuple(int | None, dt.date | None, dt.date | None): The validated period index, start and end dates, or None if not provided or invalid.
         """
         if url_args is None:
-            return None, None
+            return None, None, None
 
+        state_data = self.state_items[requested_state_idx]
+        if not isinstance(state_data, dict) or state_data.get("StateFileType") != "OutputMetering":
+            return None, None, None
+
+        # Get the data range from the state data
+        earliest_date = state_data.get("Summary", {}).get("FirstDate")
+        latest_date = state_data.get("Summary", {}).get("LastDate")
+
+        period_idx = url_args.get("period_idx", default=None, type=int)
         custom_start_date_str = url_args.get("start_date", default=None, type=str)
         custom_end_date_str = url_args.get("end_date", default=None, type=str)
 
+        # If we have a date range passed, we don't care about the period_idx
         if custom_start_date_str and custom_end_date_str:
             try:
                 custom_start_date = dt.datetime.strptime(custom_start_date_str, "%Y-%m-%d").date()  # noqa: DTZ007
@@ -287,9 +299,18 @@ class PowerControllerViewer:
             except ValueError:
                 pass
             else:
-                return custom_start_date, custom_end_date
+                if earliest_date and latest_date and \
+                    earliest_date <= custom_start_date <= latest_date and \
+                    earliest_date <= custom_end_date <= latest_date and \
+                    custom_start_date <= custom_end_date:
+                    return -1, custom_start_date, custom_end_date
 
-        return None, None
+        # Otherwise try to get the period from the period_idx
+        reporting_periods = self._get_meter_reporting_periods(requested_state_idx)
+        if period_idx is not None and 0 <= period_idx < len(reporting_periods):
+            return period_idx, None, None
+
+        return None, None, None
 
     def save_state(self, state_item: dict):
         """Save the current state to the JSON file. This assumes that the calling function has already validates the state file.
@@ -588,7 +609,7 @@ class PowerControllerViewer:
         stripped_name = device_name.replace(" ", "").replace("/", "").replace("\\", "").replace("-", "")
         return quote(stripped_name)
 
-    def build_metering_reporting_data(self, state_idx: int, custom_start_date: dt.date | None = None, custom_end_date: dt.date | None = None) -> dict:
+    def build_metering_reporting_data(self, state_idx: int, period_idx: int | None = None, custom_start_date: dt.date | None = None, custom_end_date: dt.date | None = None) -> dict:  # noqa: PLR0912
         """Builds the dict containing the data for OutputMetering.
 
         The data includes a list of UsageReportingPeriods obejcts for the OutputMetering state type,
@@ -598,6 +619,7 @@ class PowerControllerViewer:
 
         Args:
             state_idx (int): The index of the state item to build the reporting data for.
+            period_idx (int | None, optional): If provided, use this as the index of the additional reporting period to use.
             custom_start_date (dt.date | None, optional): If provided, use this as the start date for a custom reporting period.
             custom_end_date (dt.date | None, optional): If provided, use this as the end date for a custom reporting period.
 
@@ -635,7 +657,7 @@ class PowerControllerViewer:
         }
 
         # Add the reporting periods to the reporting data
-        reporting_periods = self._get_meter_reporting_periods(state_idx, custom_start_date=custom_start_date, custom_end_date=custom_end_date)
+        reporting_periods = self._get_meter_reporting_periods(state_idx, period_idx, custom_start_date=custom_start_date, custom_end_date=custom_end_date)
         reporting_data["ReportingPeriods"] = reporting_periods
         reporting_data["NumberOfPeriods"] = len(reporting_periods)
         reporting_data["NumberOfVisiblePeriods"] = sum(1 for period in reporting_periods if period.show)
@@ -706,8 +728,13 @@ class PowerControllerViewer:
             period.other_energy_used = period.global_energy_used - period.output_energy_used
             period.other_cost = period.global_cost - period.output_cost
 
+            if period.is_custom:
+                period_and_date = f"{period.start_date.strftime('%d %b')} to {period.end_date.strftime('%d %b')}"  # type: ignore[attr-defined]
+            else:
+                period_and_date = period.name + f" (from {period.start_date.strftime('%d %b')})"  # type: ignore[attr-defined]
             reporting_data["Totals"].append({
                 "Period": period.name,
+                "PeriodAndDate": period_and_date,  # type: ignore[name-defined]
                 "StartDate": period.start_date,
                 "EndDate": period.end_date,
                 "HaveData": period.have_global_data,
@@ -1238,11 +1265,12 @@ class PowerControllerViewer:
             reporting_period.global_energy_used += entry.get("EnergyUsed", 0.0) or 0.0
             reporting_period.global_cost += entry.get("Cost", 0.0) or 0.0
 
-    def _get_meter_reporting_periods(self, state_idx: int, custom_start_date: dt.date | None = None, custom_end_date: dt.date | None = None) -> list[UsageReportingPeriod]:
+    def _get_meter_reporting_periods(self, state_idx: int, period_idx: int | None = None, custom_start_date: dt.date | None = None, custom_end_date: dt.date | None = None) -> list[UsageReportingPeriod]:
         """Get the list of standard reporting periods for meter usage analysis.
 
         Args:
             state_idx (int): The index of the state item to get reporting periods for.
+            period_idx (int | None): Optional index of a specific reporting period to return.
             custom_start_date (dt.date | None): Optional custom start date for a custom reporting period.
             custom_end_date (dt.date | None): Optional custom end date for a custom reporting period.
 
@@ -1272,15 +1300,20 @@ class PowerControllerViewer:
         current_month_end = max(yesterday, this_month_start)
 
         reporting_periods.append(UsageReportingPeriod("All Dates", state_summary.get("FirstDate"), state_summary.get("LastDate")))  # noqa: FURB113
-        reporting_periods.append(UsageReportingPeriod("Last 30 Days", today - dt.timedelta(days=30), today - dt.timedelta(days=1), show=True))
+        reporting_periods.append(UsageReportingPeriod("Last 30 Days", today - dt.timedelta(days=30), today - dt.timedelta(days=1), show=True, menu=False))
         reporting_periods.append(UsageReportingPeriod("Last Month", last_month_start, last_month_end))
         reporting_periods.append(UsageReportingPeriod("This Month", this_month_start, current_month_end))
-        reporting_periods.append(UsageReportingPeriod("Last 7 Days", today - dt.timedelta(days=7), today - dt.timedelta(days=1), show=True))
+        reporting_periods.append(UsageReportingPeriod("Last 7 Days", today - dt.timedelta(days=7), today - dt.timedelta(days=1), show=True, menu=False))
         reporting_periods.append(UsageReportingPeriod("Last Week", last_week_start, last_week_end))
         reporting_periods.append(UsageReportingPeriod("This Week", this_week_start, current_week_end))
-        reporting_periods.append(UsageReportingPeriod("Yesterday", today - dt.timedelta(days=1), today - dt.timedelta(days=1), show=True))
+        reporting_periods.append(UsageReportingPeriod("Yesterday", today - dt.timedelta(days=1), today - dt.timedelta(days=1), show=True, menu=False))
         reporting_periods.append(UsageReportingPeriod("Today", today, today))
+
         if custom_start_date and custom_end_date:
-            reporting_periods.append(UsageReportingPeriod("Custom Period", custom_start_date, custom_end_date, show=True))
+            reporting_periods.append(UsageReportingPeriod("Custom Period", custom_start_date, custom_end_date, is_custom=True, show=True, menu=True))
+
+        # Now, if we have a specific period_idx, set the show flag for that period as well
+        if period_idx is not None and 0 <= period_idx < len(reporting_periods):
+            reporting_periods[period_idx].show = True
 
         return reporting_periods

@@ -486,7 +486,7 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
         return summary_page_data
 
 
-def build_output_metering_homepage(  # noqa: PLR0914, PLR0915
+def build_output_metering_homepage(  # noqa: PLR0912, PLR0914, PLR0915
     state_idx: int,
     state_next_idx: int | None,
     url_args: MultiDict[str, str] | None = None,
@@ -517,8 +517,8 @@ def build_output_metering_homepage(  # noqa: PLR0914, PLR0915
         assert isinstance(state_data, dict)
         # See if a custom start and end date is provided in the URL args
         if url_args is not None:
-            custom_start_date, custom_end_date = helper.validate_start_end_dates(url_args)
-        reporting_data = helper.build_metering_reporting_data(state_idx, custom_start_date, custom_end_date)
+            period_idx, custom_start_date, custom_end_date = helper.validate_metering_args(state_idx, url_args)
+        reporting_data = helper.build_metering_reporting_data(state_idx, period_idx, custom_start_date, custom_end_date)
         assert isinstance(reporting_data, dict)
 
         logger.log_message(reporting_data, "debug")
@@ -530,8 +530,9 @@ def build_output_metering_homepage(  # noqa: PLR0914, PLR0915
         meters_data = reporting_data.get("Meters", []) or []
         assert isinstance(meters_data, list)
 
+        # totals_data is the overall totals for each reporting period. This lists only includes those periods where show=True
         for idx, period in enumerate(totals_data):
-            period["PeriodAndDate"] = period.get("Period") + f" (from {period.get('StartDate').strftime('%d %b')})"  # type: ignore[attr-defined]
+
             have_global_data = period.get("HaveData")
             if have_global_data:
                 global_energy_used = period.get("GlobalEnergyUsed", 0)
@@ -570,12 +571,39 @@ def build_output_metering_homepage(  # noqa: PLR0914, PLR0915
                     meter_usage["EnergyUsedStr"] = "N/A"
                     meter_usage["CostStr"] = "N/A"
 
-        # Now build up the reporting periods list for the webpage
-        reporting_periods_list = []
-        for period in reporting_periods:
-            reporting_periods_list.append({
-                "Period": period.name,
-                "PeriodAndDate": period.name + f" (from {period.start_date.strftime('%d %b')})",
+        # Now build up the periods choice list for the webpage
+        periods_choice_list = []
+        added_custom = False
+        for idx, period in enumerate(reporting_periods):
+            if not period.menu:
+                continue    # Don't add to the choice list if menu flag is false
+            if period.is_custom:
+                choice = {
+                    "ID": idx,
+                    "Custom": True,
+                    "Selected": period_idx in {idx, -1},
+                    "Name": "Custom",
+                    "Description": f"{period.start_date.strftime('%d %b')} to {period.end_date.strftime('%d %b')}",
+                }
+                added_custom = True
+            else:
+                choice = {
+                    "ID": idx,
+                    "Custom": False,
+                    "Selected": period_idx == idx,
+                    "Name": period.name,
+                    "Description": period.name + f" (from {period.start_date.strftime('%d %b')})",
+                }
+            periods_choice_list.append(choice)
+
+        # Add a custom choice at the end if we don't already have one
+        if not added_custom:
+            periods_choice_list.append({
+                "ID": len(reporting_periods),
+                "Custom": True,
+                "Selected": period_idx in {idx, -1},
+                "Name": "Custom",
+                "Description": "Custom period",
             })
 
         last_save_time = state_data.get("LocalLastSaveTime", DateHelper.now())
@@ -593,7 +621,9 @@ def build_output_metering_homepage(  # noqa: PLR0914, PLR0915
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
             "FirstDate": reporting_data.get("FirstDate"),
             "LastDate": reporting_data.get("LastDate"),
-            "ReportingPeriods": reporting_periods_list,
+            "PeriodChoiceList": periods_choice_list,
+            "CustomStartDate": custom_start_date,
+            "CustomEndDate": custom_end_date,
             "Totals": totals_data,
             "Meters": meters_data,
             "DebugMessage": debug_message,
