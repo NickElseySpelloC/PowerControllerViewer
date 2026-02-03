@@ -207,6 +207,7 @@ def summary():
             summary_page_data = build_output_metering_homepage(
                 state_idx=state_idx,
                 state_next_idx=state_next_idx,
+                url_args=args,
                 debug_message=debug_message,
             )
             return render_template("summary_output_metering.html", page_data=summary_page_data)
@@ -485,12 +486,18 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
         return summary_page_data
 
 
-def build_output_metering_homepage(state_idx: int, state_next_idx: int | None, debug_message: str | None = None):  # noqa: PLR0915
+def build_output_metering_homepage(  # noqa: PLR0914, PLR0915
+    state_idx: int,
+    state_next_idx: int | None,
+    url_args: MultiDict[str, str] | None = None,
+    debug_message: str | None = None,
+):
     """Build the homepage for a OutputMeteru=ing state file.
 
     Args:
         state_idx (int): The index of the selected state which will be type PowerController.
         state_next_idx (int): The index of the next state.
+        url_args (MultDict[str, str], optional): The URL arguments to extract the state index from. If provided, it takes precedence over requested_state_idx.
         debug_message (str | None): Optional debug message to include in the response.
 
     Returns:
@@ -508,9 +515,19 @@ def build_output_metering_homepage(state_idx: int, state_next_idx: int | None, d
     try:
         state_data = helper.state_items[state_idx]
         assert isinstance(state_data, dict)
-        totals_data = state_data.get("Totals", []) or []
+        # See if a custom start and end date is provided in the URL args
+        if url_args is not None:
+            custom_start_date, custom_end_date = helper.validate_start_end_dates(url_args)
+        reporting_data = helper.build_metering_reporting_data(state_idx, custom_start_date, custom_end_date)
+        assert isinstance(reporting_data, dict)
+
+        logger.log_message(reporting_data, "debug")
+
+        reporting_periods = reporting_data.get("ReportingPeriods", []) or []
+        assert isinstance(reporting_periods, list)
+        totals_data = reporting_data.get("Totals", []) or []
         assert isinstance(totals_data, list)
-        meters_data = state_data.get("Meters", []) or []
+        meters_data = reporting_data.get("Meters", []) or []
         assert isinstance(meters_data, list)
 
         for idx, period in enumerate(totals_data):
@@ -553,6 +570,14 @@ def build_output_metering_homepage(state_idx: int, state_next_idx: int | None, d
                     meter_usage["EnergyUsedStr"] = "N/A"
                     meter_usage["CostStr"] = "N/A"
 
+        # Now build up the reporting periods list for the webpage
+        reporting_periods_list = []
+        for period in reporting_periods:
+            reporting_periods_list.append({
+                "Period": period.name,
+                "PeriodAndDate": period.name + f" (from {period.start_date.strftime('%d %b')})",
+            })
+
         last_save_time = state_data.get("LocalLastSaveTime", DateHelper.now())
         logger.log_message(f"Home: rendering device {state_data.get('DeviceName')} of type OutputMetering for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]
 
@@ -566,6 +591,9 @@ def build_output_metering_homepage(state_idx: int, state_next_idx: int | None, d
             "NextDeviceName": helper.get_state(state_next_idx, "DeviceName", default="Unknown") if state_next_idx is not None else None,
             "TimeNow": DateHelper.now_str(),
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
+            "FirstDate": reporting_data.get("FirstDate"),
+            "LastDate": reporting_data.get("LastDate"),
+            "ReportingPeriods": reporting_periods_list,
             "Totals": totals_data,
             "Meters": meters_data,
             "DebugMessage": debug_message,
@@ -897,7 +925,7 @@ def submit_data():  # noqa: PLR0912
                 "SaveTime": str,
                 "SchemaVersion": int,
                 "DeviceName": str,
-                "Totals": list,
+                "Summary": dict,
                 "Meters": list,
                 }
 

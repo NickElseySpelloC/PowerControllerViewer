@@ -47,7 +47,7 @@
                 <!-- List the energy usage for each metered output -->
                 {% for meter in page_data['Meters'] %}
                     <tr>
-                        <td>{{ meter['DisplayName'] }}</td>
+                        <td>{{ meter['Name'] }}</td>
                         {% for period in meter['Usage'] %}
                             <td>{{ period['EnergyUsedStr'] }}</td>
                             <td>{{ period['CostStr'] }}</td>

@@ -8,6 +8,7 @@ import os
 import threading
 import time
 import traceback
+from dataclasses import dataclass
 from html import escape
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,23 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 
 TEMP_PROBE_CHART_LOCATION = "static/temp_probes_chart.jpg"
+
+
+# Metered output usage =======================================
+@dataclass
+class UsageReportingPeriod:
+    """Define a reporting period for metered output usage."""
+    name: str
+    start_date: dt.date
+    end_date: dt.date
+    show: bool = False
+    have_global_data: bool = False
+    global_energy_used: float = 0.0
+    global_cost: float = 0.0
+    output_energy_used: float = 0.0
+    output_cost: float = 0.0
+    other_energy_used: float = 0.0
+    other_cost: float = 0.0
 
 
 class PowerControllerViewer:
@@ -245,6 +263,33 @@ class PowerControllerViewer:
             day_idx = requested_day_idx
 
         return state_idx, day_idx, max_day_idx
+
+    @staticmethod
+    def validate_start_end_dates(url_args: MultiDict[str, str] | None) -> tuple[dt.date | None, dt.date | None]:
+        """Validate and extract custom start and end dates from URL arguments.
+
+        Args:
+            url_args (MultiDict[str, str] | None): The URL arguments to extract the dates from.
+
+        Returns:
+            tuple(dt.date | None, dt.date | None): The validated start and end dates, or None if not provided or invalid.
+        """
+        if url_args is None:
+            return None, None
+
+        custom_start_date_str = url_args.get("start_date", default=None, type=str)
+        custom_end_date_str = url_args.get("end_date", default=None, type=str)
+
+        if custom_start_date_str and custom_end_date_str:
+            try:
+                custom_start_date = dt.datetime.strptime(custom_start_date_str, "%Y-%m-%d").date()  # noqa: DTZ007
+                custom_end_date = dt.datetime.strptime(custom_end_date_str, "%Y-%m-%d").date()  # noqa: DTZ007
+            except ValueError:
+                pass
+            else:
+                return custom_start_date, custom_end_date
+
+        return None, None
 
     def save_state(self, state_item: dict):
         """Save the current state to the JSON file. This assumes that the calling function has already validates the state file.
@@ -542,6 +587,139 @@ class PowerControllerViewer:
         # Strip unwanted characters and URL-encode the rest
         stripped_name = device_name.replace(" ", "").replace("/", "").replace("\\", "").replace("-", "")
         return quote(stripped_name)
+
+    def build_metering_reporting_data(self, state_idx: int, custom_start_date: dt.date | None = None, custom_end_date: dt.date | None = None) -> dict:
+        """Builds the dict containing the data for OutputMetering.
+
+        The data includes a list of UsageReportingPeriods obejcts for the OutputMetering state type,
+        populated with the state data.
+
+        This will be cached in the self.output_metering_data dict for the given state index.
+
+        Args:
+            state_idx (int): The index of the state item to build the reporting data for.
+            custom_start_date (dt.date | None, optional): If provided, use this as the start date for a custom reporting period.
+            custom_end_date (dt.date | None, optional): If provided, use this as the end date for a custom reporting period.
+
+        Returns:
+            dict: the reporting data structure for the OutputMetering state type, or an empty dict on error.
+        """
+        # TO DO: caching of the output metering data per state index
+        # Validate that the state index keys to a OutputMetering state type
+        state_data = self.get_state(state_idx)
+        if state_data.get("StateFileType") != "OutputMetering":
+            self.logger.log_message(f"State index {state_idx} is not of type OutputMetering, cannot build metering reporting data.", "error")
+            return {}
+
+        # If a custom date range is provided, make sure both the start and end dates are provided
+        if (custom_start_date is not None and custom_end_date is None) or (custom_start_date is None and custom_end_date is not None):
+            self.logger.log_message("Both custom_start_date and custom_end_date must be provided for a custom reporting period.", "error")
+            return {}
+
+        state_summary = state_data.get("Summary", {})
+        meter_data = state_data.get("Meters", [])
+
+        if not state_summary or not meter_data:
+            self.logger.log_message(f"State index {state_idx} is missing Summary or Meters data, cannot build metering reporting data.", "error")
+            return {}
+
+        reporting_data = {
+            "FirstDate": state_summary.get("FirstDate"),
+            "LastDate": state_summary.get("LastDate"),
+            "NumberOfMeters": len(meter_data),
+            "ReportingPeriods": [],     # The reporting periods
+            "NumberOfPeriods": 0,
+            "NumberOfVisiblePeriods": 0,
+            "Totals": [],                # The total usage by period
+            "Meters": [],                # The usage data per meters and period
+        }
+
+        # Add the reporting periods to the reporting data
+        reporting_periods = self._get_meter_reporting_periods(state_idx, custom_start_date=custom_start_date, custom_end_date=custom_end_date)
+        reporting_data["ReportingPeriods"] = reporting_periods
+        reporting_data["NumberOfPeriods"] = len(reporting_periods)
+        reporting_data["NumberOfVisiblePeriods"] = sum(1 for period in reporting_periods if period.show)
+        # Get the global totals for each reporting period and save to the period object
+        for period in reporting_periods:
+            self._get_global_usage_totals(state_idx, period)
+
+        # Now build the usage data for each meter and reporting period
+        # Now get the totals for each output and reporting period from the csv_data
+        for meter in meter_data:
+            display_name = meter.get("DisplayName") or meter.get("Output")
+            meter_entry = {
+                "Name": display_name,
+                "Usage": []
+            }
+
+            # Loop through each reporting period and get the totals for this output
+            for period in reporting_periods:
+                # Skip if not show
+                if not period.show:
+                    continue
+                # Setup the default object for this output and period
+                usage_entry = {
+                    "Period": period.name,
+                    "StartDate": period.start_date,
+                    "EndDate": period.end_date,
+                    "HaveData": False,
+                    "EnergyUsed": 0.0,
+                    "EnergyUsedPcnt": None,
+                    "Cost": 0.0,
+                    "CostPcnt": None,
+                }
+
+                # Make sure this meter has data on or before the start of this period
+                if meter.get("FirstDate") > period.start_date:
+                    meter_entry["Usage"].append(usage_entry)
+                    continue  # Skip this period for this output
+                usage_entry["HaveData"] = True
+
+                # Now calculate the totals for this output and period from the CSV data
+                for item in meter.get("Usage", []):
+                    if period.start_date <= item["Date"] <= period.end_date:
+                        usage_entry["HaveData"] = True
+                        usage_entry["EnergyUsed"] += item.get("EnergyUsed", 0.0)
+                        usage_entry["Cost"] += item.get("Cost", 0.0)
+
+                # Add usage for this output to the global output totals for this period
+                period.output_energy_used += usage_entry["EnergyUsed"]
+                period.output_cost += usage_entry["Cost"]
+
+                # Now calculate the percentages if we have global usage data
+                if period.have_global_data:
+                    if period.global_energy_used > 0:
+                        usage_entry["EnergyUsedPcnt"] = usage_entry["EnergyUsed"] / period.global_energy_used
+                    if period.global_cost > 0:
+                        usage_entry["CostPcnt"] = usage_entry["Cost"] / period.global_cost
+
+                meter_entry["Usage"].append(usage_entry)
+
+            # And finally append this usage to the system state
+            reporting_data["Meters"].append(meter_entry)
+
+        # Finally write out the totals section
+        for period in reporting_periods:
+            # Skip if not show
+            if not period.show:
+                continue
+            period.other_energy_used = period.global_energy_used - period.output_energy_used
+            period.other_cost = period.global_cost - period.output_cost
+
+            reporting_data["Totals"].append({
+                "Period": period.name,
+                "StartDate": period.start_date,
+                "EndDate": period.end_date,
+                "HaveData": period.have_global_data,
+                "GlobalEnergyUsed": period.global_energy_used,
+                "GlobalCost": period.global_cost,
+                "OutputEnergyUsed": period.output_energy_used,
+                "OutputCost": period.output_cost,
+                "OtherEnergyUsed": period.other_energy_used,
+                "OtherCost": period.other_cost,
+            })
+
+        return reporting_data
 
     # ============ PRIVATE FUNCTIONS ========================================================================
 
@@ -1024,3 +1202,85 @@ class PowerControllerViewer:
             self.logger.log_message(f"Error generating temperature probe chart: {e!s}", "error")
             return False
         return True
+
+    def _get_global_usage_totals(self, state_idx: int, reporting_period: UsageReportingPeriod):
+        """Gets the total energy usage between the specified dates.
+
+        The passed reporting_period object is updated with the totals. If no data is available, the object isn't updated.
+
+        Note: Energy usage is returned in kWh.
+
+        Args:
+            state_idx (int): The index of the state item to get usage totals for.
+            reporting_period (UsageReportingPeriod): The reporting period to get usage totals for.
+        """
+        # Skip if this period is set to don't show
+        if not reporting_period.show:
+            return
+
+        # By default return no data
+        reporting_period.have_global_data = False
+
+        # First scan self.usage_data and make sure we have entries on or before the start_date and on or after the end_date
+        global_data = self.get_state(state_idx).get("Totals", [])
+        if not global_data:
+            return
+
+        for entry in global_data:
+            entry_date = entry.get("Date")
+            if not isinstance(entry_date, dt.date):
+                continue
+            if entry_date < reporting_period.start_date or entry_date > reporting_period.end_date:
+                continue
+
+            # Now aggregate the usage data for the specified date range
+            reporting_period.have_global_data = True
+            reporting_period.global_energy_used += entry.get("EnergyUsed", 0.0) or 0.0
+            reporting_period.global_cost += entry.get("Cost", 0.0) or 0.0
+
+    def _get_meter_reporting_periods(self, state_idx: int, custom_start_date: dt.date | None = None, custom_end_date: dt.date | None = None) -> list[UsageReportingPeriod]:
+        """Get the list of standard reporting periods for meter usage analysis.
+
+        Args:
+            state_idx (int): The index of the state item to get reporting periods for.
+            custom_start_date (dt.date | None): Optional custom start date for a custom reporting period.
+            custom_end_date (dt.date | None): Optional custom end date for a custom reporting period.
+
+        Returns:
+            list[UsageReportingPeriod]: List of reporting periods.
+        """
+        # First build a list of reporting periods that we want to analyse
+        reporting_periods = []
+        today = DateHelper.today()
+        state_summary = self.get_state(state_idx).get("Summary", {})
+
+        # Calendar-based reporting periods
+        # Weeks are Monday-Sunday (Python's weekday(): Monday=0 .. Sunday=6)
+        this_week_start = today - dt.timedelta(days=today.weekday())
+        last_week_start = this_week_start - dt.timedelta(days=7)
+        last_week_end = this_week_start - dt.timedelta(days=1)
+
+        # Month boundaries
+        this_month_start = today.replace(day=1)
+        last_month_end = this_month_start - dt.timedelta(days=1)
+        last_month_start = last_month_end.replace(day=1)
+
+        yesterday = today - dt.timedelta(days=1)
+
+        # Clamp "to yesterday" periods so end_date is never before start_date
+        current_week_end = max(yesterday, this_week_start)
+        current_month_end = max(yesterday, this_month_start)
+
+        reporting_periods.append(UsageReportingPeriod("All Dates", state_summary.get("FirstDate"), state_summary.get("LastDate")))  # noqa: FURB113
+        reporting_periods.append(UsageReportingPeriod("Last 30 Days", today - dt.timedelta(days=30), today - dt.timedelta(days=1), show=True))
+        reporting_periods.append(UsageReportingPeriod("Last Month", last_month_start, last_month_end))
+        reporting_periods.append(UsageReportingPeriod("This Month", this_month_start, current_month_end))
+        reporting_periods.append(UsageReportingPeriod("Last 7 Days", today - dt.timedelta(days=7), today - dt.timedelta(days=1), show=True))
+        reporting_periods.append(UsageReportingPeriod("Last Week", last_week_start, last_week_end))
+        reporting_periods.append(UsageReportingPeriod("This Week", this_week_start, current_week_end))
+        reporting_periods.append(UsageReportingPeriod("Yesterday", today - dt.timedelta(days=1), today - dt.timedelta(days=1), show=True))
+        reporting_periods.append(UsageReportingPeriod("Today", today, today))
+        if custom_start_date and custom_end_date:
+            reporting_periods.append(UsageReportingPeriod("Custom Period", custom_start_date, custom_end_date, show=True))
+
+        return reporting_periods
