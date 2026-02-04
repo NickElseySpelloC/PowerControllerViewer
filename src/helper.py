@@ -819,11 +819,11 @@ class PowerControllerViewer:
         
         Args:
             timestamp (float): The time when the state was loaded.
-            file_count (int | None): The number of state files loaded. If None, uses current state_items count.
+            file_count (int | None): The number of state files loaded. If None, uses current file count from disk.
         """
         try:
             if file_count is None:
-                file_count = len(self.state_items)
+                file_count = self._get_current_file_count()
             
             metadata = {
                 "last_load_time": timestamp,
