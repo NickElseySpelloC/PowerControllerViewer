@@ -516,6 +516,9 @@ def build_output_metering_homepage(  # noqa: PLR0912, PLR0914, PLR0915
         state_data = helper.state_items[state_idx]
         assert isinstance(state_data, dict)
         # See if a custom start and end date is provided in the URL args
+        period_idx = None
+        custom_start_date = None
+        custom_end_date = None
         if url_args is not None:
             period_idx, custom_start_date, custom_end_date = helper.validate_metering_args(state_idx, url_args)
         reporting_data = helper.build_metering_reporting_data(state_idx, period_idx, custom_start_date, custom_end_date)
@@ -610,6 +613,9 @@ def build_output_metering_homepage(  # noqa: PLR0912, PLR0914, PLR0915
         logger.log_message(f"Home: rendering device {state_data.get('DeviceName')} of type OutputMetering for client {client_ip}. State timestamp: {last_save_time.strftime('%Y-%m-%d %H:%M:%S')}", "all")  # pyright: ignore[reportOptionalMemberAccess]
 
         # Build a dict object that we will use to pass the information to the web page
+        first_date = reporting_data.get("FirstDate")
+        last_date = reporting_data.get("LastDate")
+
         summary_page_data = {
             "AccessKey": config.get("Website", "AccessKey"),
             "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
@@ -619,11 +625,11 @@ def build_output_metering_homepage(  # noqa: PLR0912, PLR0914, PLR0915
             "NextDeviceName": helper.get_state(state_next_idx, "DeviceName", default="Unknown") if state_next_idx is not None else None,
             "TimeNow": DateHelper.now_str(),
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
-            "FirstDate": reporting_data.get("FirstDate"),
-            "LastDate": reporting_data.get("LastDate"),
+            "FirstDate": first_date.isoformat() if first_date else None,
+            "LastDate": last_date.isoformat() if last_date else None,
             "PeriodChoiceList": periods_choice_list,
-            "CustomStartDate": custom_start_date,
-            "CustomEndDate": custom_end_date,
+            "CustomStartDate": custom_start_date.isoformat() if custom_start_date else None,
+            "CustomEndDate": custom_end_date.isoformat() if custom_end_date else None,
             "Totals": totals_data,
             "Meters": meters_data,
             "DebugMessage": debug_message,

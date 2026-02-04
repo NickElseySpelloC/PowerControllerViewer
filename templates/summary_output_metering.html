@@ -15,17 +15,69 @@
         <h1>{{page_data['DeviceName']}}</h1>
 
         <!-- Navigation Buttons -->
-        <div>
-            <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-               class="button">
-               Home
-            </a>
-            {% if page_data['NextIndex'] is not none %}
-                <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
-                class="button">
-                Go to {{ page_data['NextDeviceName'] }} >>>
+        <div style="display: flex; align-items: center; margin-bottom: 20px;">
+            <div>
+                <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
+                   class="button">
+                   Home
                 </a>
-            {% endif %}
+                {% if page_data['NextIndex'] is not none %}
+                    <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
+                    class="button">
+                    Go to {{ page_data['NextDeviceName'] }} >>>
+                    </a>
+                {% endif %}
+            </div>
+
+            &nbsp;&nbsp;
+
+            <!-- Period Selection Form -->
+            <div>
+                <form id="periodForm" method="get" action="{{ url_for('views.summary') }}" style="margin: 0;"
+                    data-custom-start="{{ page_data['CustomStartDate'] or '' }}"
+                    data-custom-end="{{ page_data['CustomEndDate'] or '' }}"
+                    data-min-date="{{ page_data['FirstDate'] }}"
+                    data-max-date="{{ page_data['LastDate'] }}">
+                    <input type="hidden" name="state_idx" value="{{ page_data['CurrentIndex'] }}">
+                    {% if page_data['AccessKey'] %}
+                        <input type="hidden" name="key" value="{{ page_data['AccessKey'] }}">
+                    {% endif %}
+                    
+                    <label for="periodSelect">Add Period:</label>
+                    <select id="periodSelect" name="period_idx">
+                        {% for choice in page_data['PeriodChoiceList'] %}
+                            <option value="{{ choice['ID'] }}" 
+                                    data-custom="{{ choice['Custom']|lower }}"
+                                    {% if choice['Selected'] %}selected{% endif %}>
+                                {{ choice['Name'] }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    
+                    &nbsp;&nbsp;
+                    
+                    <label for="startDate">Start Date:</label>
+                    <input type="date" id="startDate" name="start_date" 
+                        disabled
+                        {% if page_data['CustomStartDate'] %}value="{{ page_data['CustomStartDate'] }}"{% endif %}
+                        min="{{ page_data['FirstDate'] }}" 
+                        max="{{ page_data['LastDate'] }}">
+                    
+                    &nbsp;&nbsp;
+                    
+                    <label for="endDate">End Date:</label>
+                    <input type="date" id="endDate" name="end_date" 
+                        disabled
+                        {% if page_data['CustomEndDate'] %}value="{{ page_data['CustomEndDate'] }}"{% endif %}
+                        min="{{ page_data['FirstDate'] }}" 
+                        max="{{ page_data['LastDate'] }}">
+                    
+                    &nbsp;&nbsp;
+                    
+                    <button type="submit" class="button">Submit</button>
+                </form>
+            </div>
+
         </div>
 
         <table>
@@ -79,5 +131,117 @@
         type="text/javascript" 
         src="{{ url_for('static', filename='index.js') }}"
     ></script>
+    <script>
+        // Period selection form logic
+        const form = document.getElementById('periodForm');
+        const periodSelect = document.getElementById('periodSelect');
+        const startDateInput = document.getElementById('startDate');
+        const endDateInput = document.getElementById('endDate');
+        
+        // Read template variables from data attributes
+        const customStartDate = form.dataset.customStart || null;
+        const customEndDate = form.dataset.customEnd || null;
+        const minDateStr = form.dataset.minDate;
+        const maxDateStr = form.dataset.maxDate;
+
+        // Function to toggle date fields based on selection
+        function updateDateFields() {
+            const selectedOption = periodSelect.options[periodSelect.selectedIndex];
+            const isCustom = selectedOption.getAttribute('data-custom') === 'true';
+            
+            startDateInput.disabled = !isCustom;
+            endDateInput.disabled = !isCustom;
+            
+            // If switching to non-custom, clear the date inputs
+            if (!isCustom) {
+                startDateInput.value = '';
+                endDateInput.value = '';
+            } else {
+                // If switching to custom, populate with defaults if available
+                if (customStartDate) {
+                    startDateInput.value = customStartDate;
+                }
+                if (customEndDate) {
+                    endDateInput.value = customEndDate;
+                }
+            }
+        }
+
+        // Function to validate dates
+        function validateDates() {
+            const startDate = new Date(startDateInput.value);
+            const endDate = new Date(endDateInput.value);
+            const minDate = new Date(minDateStr);
+            const maxDate = new Date(maxDateStr);
+
+            if (startDateInput.value && endDateInput.value) {
+                if (startDate > endDate) {
+                    alert('Start Date must be less than or equal to End Date');
+                    return false;
+                }
+            }
+
+            if (startDateInput.value) {
+                if (startDate < minDate || startDate > maxDate) {
+                    alert('Start Date must be between ' + minDateStr + ' and ' + maxDateStr);
+                    return false;
+                }
+            }
+
+            if (endDateInput.value) {
+                if (endDate < minDate || endDate > maxDate) {
+                    alert('End Date must be between ' + minDateStr + ' and ' + maxDateStr);
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Handle form submission
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const selectedOption = periodSelect.options[periodSelect.selectedIndex];
+            const isCustom = selectedOption.getAttribute('data-custom') === 'true';
+            const stateIdx = document.querySelector('input[name="state_idx"]').value;
+            const accessKey = document.querySelector('input[name="key"]')?.value;
+            
+            let url = '/summary?state_idx=' + stateIdx;
+            
+            if (accessKey) {
+                url += '&key=' + accessKey;
+            }
+            
+            if (isCustom) {
+                // Validate dates for custom period
+                if (!startDateInput.value || !endDateInput.value) {
+                    alert('Please select both Start Date and End Date for custom period');
+                    return;
+                }
+                
+                if (!validateDates()) {
+                    return;
+                }
+                
+                url += '&start_date=' + startDateInput.value + '&end_date=' + endDateInput.value;
+            } else {
+                // Use period_idx for non-custom periods
+                url += '&period_idx=' + selectedOption.value;
+            }
+            
+            window.location.href = url;
+        });
+
+        // Listen for changes to the select dropdown
+        periodSelect.addEventListener('change', updateDateFields);
+
+        // Listen for date changes to validate
+        startDateInput.addEventListener('change', validateDates);
+        endDateInput.addEventListener('change', validateDates);
+
+        // Initialize the form state on page load
+        updateDateFields();
+    </script>
 </body>
 </html>

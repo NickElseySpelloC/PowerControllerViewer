@@ -729,7 +729,7 @@ class PowerControllerViewer:
             period.other_cost = period.global_cost - period.output_cost
 
             if period.is_custom:
-                period_and_date = f"{period.start_date.strftime('%d %b')} to {period.end_date.strftime('%d %b')}"  # type: ignore[attr-defined]
+                period_and_date = f"Custom: {period.start_date.strftime('%d %b')} to {period.end_date.strftime('%d %b')}"  # type: ignore[attr-defined]
             else:
                 period_and_date = period.name + f" (from {period.start_date.strftime('%d %b')})"  # type: ignore[attr-defined]
             reporting_data["Totals"].append({
