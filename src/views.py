@@ -521,11 +521,9 @@ def build_output_metering_homepage(  # noqa: PLR0912, PLR0914, PLR0915
         custom_end_date = None
         if url_args is not None:
             period_idx, custom_start_date, custom_end_date = helper.validate_metering_args(state_idx, url_args)
+
         reporting_data = helper.build_metering_reporting_data(state_idx, period_idx, custom_start_date, custom_end_date)
         assert isinstance(reporting_data, dict)
-
-        logger.log_message(reporting_data, "debug")
-
         reporting_periods = reporting_data.get("ReportingPeriods", []) or []
         assert isinstance(reporting_periods, list)
         totals_data = reporting_data.get("Totals", []) or []
