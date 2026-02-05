@@ -132,7 +132,6 @@ class PowerControllerViewer:
 
         # Check if another process recently loaded
         cache_meta = self._get_cache_metadata()
-        file_count_changed = False
         if cache_meta:
             last_load_time = cache_meta.get("last_load_time", 0)
             last_load_pid = cache_meta.get("last_load_pid")
@@ -145,7 +144,7 @@ class PowerControllerViewer:
                     f"File count changed ({cached_file_count} -> {current_file_count}), forcing reload in this process",
                     "debug"
                 )
-                file_count_changed = True
+                # Don't wait for other processes - fall through to reload immediately
             elif time_since_load < 15 and last_load_pid != os.getpid():
                 self.logger.log_message(
                     f"Initial load (PID {os.getpid()}) waiting - process {last_load_pid} "
@@ -163,13 +162,6 @@ class PowerControllerViewer:
                                 "debug"
                             )
                             return
-        
-        # If file count changed, skip the wait and force reload
-        if file_count_changed:
-            self.logger.log_message(
-                f"Skipping wait due to file count change, forcing immediate reload",
-                "debug"
-            )
 
         # No cache available or too old, try to load
         lock_acquired = False
