@@ -726,7 +726,8 @@ class PowerControllerViewer:
                 }
 
                 # Make sure this meter has data on or before the start of this period
-                if meter.get("FirstDate") > period.start_date:
+                first_date = meter.get("FirstDate")
+                if not first_date or first_date > period.start_date:
                     meter_entry["Usage"].append(usage_entry)
                     continue  # Skip this period for this output
                 usage_entry["HaveData"] = True
