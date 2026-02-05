@@ -104,24 +104,47 @@ class PowerControllerViewer:
 
     def load_state_files(self):
         """Load the available state from the JSON files (thread-safe)."""
+        # Get current file count to check against cached count
+        current_file_count = self._get_current_file_count()
+        
         # Check if we have a recent in-process cached copy
         with PowerControllerViewer._state_lock:
             if PowerControllerViewer._state_cache is not None:
-                self.state_items = PowerControllerViewer._state_cache.copy()
-                self.logger.log_message(
-                    f"Using in-process cached state data ({len(self.state_items)} items)",
-                    "debug"
-                )
-                return
+                # Check if file count matches the count in our own cache
+                cached_file_count = len(PowerControllerViewer._state_cache)
+                
+                if cached_file_count != current_file_count:
+                    self.logger.log_message(
+                        f"File count changed ({cached_file_count} -> {current_file_count}), invalidating cache",
+                        "debug"
+                    )
+                    # Invalidate cache and continue to reload
+                    PowerControllerViewer._state_cache = None
+                    PowerControllerViewer._state_cache_timestamp = None
+                else:
+                    self.state_items = PowerControllerViewer._state_cache.copy()
+                    self.logger.log_message(
+                        f"Using in-process cached state data ({len(self.state_items)} items)",
+                        "debug"
+                    )
+                    return
 
         # Check if another process recently loaded
         cache_meta = self._get_cache_metadata()
         if cache_meta:
             last_load_time = cache_meta.get("last_load_time", 0)
             last_load_pid = cache_meta.get("last_load_pid")
+            cached_file_count = cache_meta.get("file_count")
             time_since_load = time.time() - last_load_time
 
-            if time_since_load < 15 and last_load_pid != os.getpid():
+            # Check if file count has changed - if so, we need to reload regardless of when another process loaded
+            if cached_file_count is not None and cached_file_count != current_file_count:
+                self.logger.log_message(
+                    f"File count changed ({cached_file_count} -> {current_file_count}), forcing reload in this process",
+                    "debug"
+                )
+                # Don't wait for other processes - fall through to reload immediately
+            elif time_since_load < 15 and last_load_pid != os.getpid():
                 self.logger.log_message(
                     f"Initial load (PID {os.getpid()}) waiting - process {last_load_pid} "
                     f"loaded {time_since_load:.1f}s ago, waiting for worker...",
@@ -341,27 +364,38 @@ class PowerControllerViewer:
         # Look in the state_data subdirectory for the all the available state files
         filename_concat = ""
         return_value = False
+        max_file_modified = 0.0
+        
         if self.state_data_dir.exists() and self.state_data_dir.is_dir():
             json_files = [f for f in self.state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")]
 
+            # First check if the file list has changed (files added or removed)
             for file_path in json_files:
-                # This will be the concatentnation of all the state file names - used to check if files have been added or removed
-                filename_concat += file_path.name
-
-                if file_path.name.startswith("."):
-                    # Skip hidden files
-                    continue
-
-                file_modified = file_path.stat().st_mtime
-                if not self.last_state_check or file_modified > self.last_state_check:
-                    # We have a more recent state file
-                    return_value = True
-                    self.last_state_check = file_modified
+                if not file_path.name.startswith("."):
+                    # This will be the concatenation of all the state file names - used to check if files have been added or removed
+                    filename_concat += file_path.name
 
             if self.last_state_filename_hash != filename_concat:
                 self.logger.log_message(f"State files have changed. Reloading state files from {self.state_data_dir}.", "debug")
                 self.last_state_filename_hash = filename_concat
                 return_value = True
+            
+            # Then check if any file has been modified since the last check
+            for file_path in json_files:
+                if file_path.name.startswith("."):
+                    # Skip hidden files
+                    continue
+
+                file_modified = file_path.stat().st_mtime
+                max_file_modified = max(max_file_modified, file_modified)
+                
+                if not self.last_state_check or file_modified > self.last_state_check:
+                    # We have a more recent state file
+                    return_value = True
+            
+            # Update last_state_check to the most recent file modification time found
+            if max_file_modified > 0:
+                self.last_state_check = max_file_modified
 
         return return_value
 
@@ -765,13 +799,37 @@ class PowerControllerViewer:
             pass
         return None
 
-    def _update_cache_metadata(self, timestamp: float):
-        """Update cache metadata with current load time and process ID."""
+    def _get_current_file_count(self) -> int:
+        """Get the current count of state JSON files in the state data directory.
+        
+        Returns:
+            int: The number of JSON files (excluding hidden files starting with .).
+        """
+        if not self.state_data_dir.exists() or not self.state_data_dir.is_dir():
+            return 0
+        
+        json_files = [
+            f for f in self.state_data_dir.iterdir() 
+            if f.is_file() and f.name.endswith(".json") and not f.name.startswith(".")
+        ]
+        return len(json_files)
+
+    def _update_cache_metadata(self, timestamp: float, file_count: int | None = None):
+        """Update cache metadata with current load time, process ID, and file count.
+        
+        Args:
+            timestamp (float): The time when the state was loaded.
+            file_count (int | None): The number of state files loaded. If None, uses current file count from disk.
+        """
         try:
+            if file_count is None:
+                file_count = self._get_current_file_count()
+            
             metadata = {
                 "last_load_time": timestamp,
                 "last_load_pid": os.getpid(),
-                "last_load_datetime": DateHelper.now().isoformat()
+                "last_load_datetime": DateHelper.now().isoformat(),
+                "file_count": file_count
             }
             assert isinstance(PowerControllerViewer._cache_metadata_file, Path)
             with PowerControllerViewer._cache_metadata_file.open("w") as f:
