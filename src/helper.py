@@ -110,11 +110,10 @@ class PowerControllerViewer:
         # Check if we have a recent in-process cached copy
         with PowerControllerViewer._state_lock:
             if PowerControllerViewer._state_cache is not None:
-                # Check if file count matches cached count
-                cache_meta = self._get_cache_metadata()
-                cached_file_count = cache_meta.get("file_count") if cache_meta else None
+                # Check if file count matches the count in our own cache
+                cached_file_count = len(PowerControllerViewer._state_cache)
                 
-                if cached_file_count is not None and cached_file_count != current_file_count:
+                if cached_file_count != current_file_count:
                     self.logger.log_message(
                         f"File count changed ({cached_file_count} -> {current_file_count}), invalidating cache",
                         "debug"
