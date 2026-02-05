@@ -106,13 +106,13 @@ class PowerControllerViewer:
         """Load the available state from the JSON files (thread-safe)."""
         # Get current file count to check against cached count
         current_file_count = self._get_current_file_count()
-        
+
         # Check if we have a recent in-process cached copy
         with PowerControllerViewer._state_lock:
             if PowerControllerViewer._state_cache is not None:
                 # Check if file count matches the count in our own cache
                 cached_file_count = len(PowerControllerViewer._state_cache)
-                
+
                 if cached_file_count != current_file_count:
                     self.logger.log_message(
                         f"File count changed ({cached_file_count} -> {current_file_count}), invalidating cache",
@@ -365,7 +365,7 @@ class PowerControllerViewer:
         filename_concat = ""
         return_value = False
         max_file_modified = 0.0
-        
+
         if self.state_data_dir.exists() and self.state_data_dir.is_dir():
             json_files = [f for f in self.state_data_dir.iterdir() if f.is_file() and f.name.endswith(".json")]
 
@@ -379,7 +379,7 @@ class PowerControllerViewer:
                 self.logger.log_message(f"State files have changed. Reloading state files from {self.state_data_dir}.", "debug")
                 self.last_state_filename_hash = filename_concat
                 return_value = True
-            
+
             # Then check if any file has been modified since the last check
             for file_path in json_files:
                 if file_path.name.startswith("."):
@@ -388,11 +388,11 @@ class PowerControllerViewer:
 
                 file_modified = file_path.stat().st_mtime
                 max_file_modified = max(max_file_modified, file_modified)
-                
+
                 if not self.last_state_check or file_modified > self.last_state_check:
                     # We have a more recent state file
                     return_value = True
-            
+
             # Update last_state_check to the most recent file modification time found
             if max_file_modified > 0:
                 self.last_state_check = max_file_modified
@@ -801,22 +801,22 @@ class PowerControllerViewer:
 
     def _get_current_file_count(self) -> int:
         """Get the current count of state JSON files in the state data directory.
-        
+
         Returns:
             int: The number of JSON files (excluding hidden files starting with .).
         """
         if not self.state_data_dir.exists() or not self.state_data_dir.is_dir():
             return 0
-        
+
         json_files = [
-            f for f in self.state_data_dir.iterdir() 
+            f for f in self.state_data_dir.iterdir()
             if f.is_file() and f.name.endswith(".json") and not f.name.startswith(".")
         ]
         return len(json_files)
 
     def _update_cache_metadata(self, timestamp: float, file_count: int | None = None):
         """Update cache metadata with current load time, process ID, and file count.
-        
+
         Args:
             timestamp (float): The time when the state was loaded.
             file_count (int | None): The number of state files loaded. If None, uses current file count from disk.
@@ -824,7 +824,7 @@ class PowerControllerViewer:
         try:
             if file_count is None:
                 file_count = self._get_current_file_count()
-            
+
             metadata = {
                 "last_load_time": timestamp,
                 "last_load_pid": os.getpid(),

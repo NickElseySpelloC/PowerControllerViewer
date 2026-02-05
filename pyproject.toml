@@ -1,6 +1,6 @@
 [project]
 name = "PowerControllerViewer"
-version = "1.2.0"
+version = "1.2.1"
 description = "View the status of one or more PowerController or LightingControl application instances"
 readme = "README.md"
 requires-python = ">=3.13"
