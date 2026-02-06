@@ -859,6 +859,25 @@ class PowerControllerViewer:
 
                     file_path = Path(self.state_data_dir) / file_name
 
+                    # Check if we should delete old state files
+                    delete_old_files_hours = self.config.get("Files", "DeleteOldStateFiles")
+                    if isinstance(delete_old_files_hours, int) and delete_old_files_hours > 0:
+                        file_modified_time = file_path.stat().st_mtime
+                        current_time = time.time()
+                        age_hours = (current_time - file_modified_time) / 3600
+
+                        if age_hours > delete_old_files_hours:
+                            try:
+                                file_path.unlink()
+                                self.logger.log_message(
+                                    f"Deleted obsolete state file {file_path} (age: {age_hours:.1f} hours, threshold: {delete_old_files_hours} hours).",
+                                    "debug"
+                                )
+                                continue
+                            except OSError as e:
+                                self.logger.log_message(f"Failed to delete obsolete state file {file_path}: {e}", "error")
+                                continue
+
                     self.logger.log_message(f"Attempting to load state file: {file_path}.", "debug")
 
                     try:

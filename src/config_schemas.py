@@ -47,6 +47,7 @@ class ConfigSchema:
                     "LogProcessID": {"type": "boolean", "required": False, "nullable": True},
                     "LogfileVerbosity": {"type": "string", "required": True, "allowed": ["none", "error", "warning", "summary", "detailed", "debug", "all"]},
                     "ConsoleVerbosity": {"type": "string", "required": True, "allowed": ["error", "warning", "summary", "detailed", "debug"]},
+                    "DeleteOldStateFiles": {"type": "number", "required": False, "nullable": True, "min": 0, "max": 168},
                 },
             },
         }

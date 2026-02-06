@@ -28,7 +28,7 @@ state_data/
 /*.log
 /*.json
 /*.txt
-/*.yaml
+/config.yaml
 systemd_restart.sh
 logs
 static/*.jpg
