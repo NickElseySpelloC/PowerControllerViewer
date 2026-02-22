@@ -14,43 +14,72 @@
     <div>
         <h2>Select a device to view</h2>
         
-        <!-- List of states -->
-        <div>
-            <table>
-                <thead>
+        <!-- Table for full width display -->
+        <table class="info_table full">
+            <thead>
+                <tr>
+                    <th>Device</th>
+                    <th>Type</th>
+                    <th>Last Update</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for device in page_data['Devices'] %}
                     <tr>
-                        <th>Device</th>
-                        <th>Type</th>
-                        <th>Last Update</th>
-                        <th>Status</th>
+                        <td style="vertical-align: middle;">
+                            <a href="{{ url_for('views.summary', state_idx=device['StateIndex'], key=page_data['AccessKey']) }}" >
+                            <b>{{ device['DeviceName'] }}</b>
+                            </a>
+                        </td>
+                        <td style="vertical-align: middle;"> {{ device['DeviceDescription'] }}</td>
+                        <td style="vertical-align: middle;"> {{ device['LastCheck'][:-3] }}</td>
+                        <td style="vertical-align: middle;"> 
+                            {% if device['IsDeviceRunning'] %} 
+                                <span class="circle green-circle"></span>
+                            {% else %}
+                                <span class="circle black-circle"></span>
+                            {% endif %}
+                            {{ device['Status'] }}
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-                    {% for device in page_data['Devices'] %}
-                        <tr>
-                            <td style="vertical-align: middle;">
-                                <a href="{{ url_for('views.summary', state_idx=device['StateIndex'], key=page_data['AccessKey']) }}" >
-                                <b>{{ device['DeviceName'] }}</b>
-                                </a>
-                            </td>
-                            <td style="vertical-align: middle;"> {{ device['DeviceDescription'] }}</td>
-                            <td style="vertical-align: middle;"> {{ device['LastCheck'][:-3] }}</td>
-                            <td style="vertical-align: middle;"> 
-                                {% if device['IsDeviceRunning'] %} 
-                                    <span class="circle green-circle"></span>
-                                {% else %}
-                                    <span class="circle black-circle"></span>
-                                {% endif %}
-                                {{ device['Status'] }}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <div class="footer_text" style="margin-top: 10px;">
-                State Data: Most recent update at {{ page_data['LastStateUpdate'] }}, last refresh at {{ page_data['LastStateReload'] }}
-            </div>
-        </div>       
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Table for mobile display -->
+        <table class="info_table compact">        
+            <thead>
+                <tr>
+                    <th>Device</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for device in page_data['Devices'] %}
+                    <tr>
+                        <td style="vertical-align: middle;">
+                            <a href="{{ url_for('views.summary', state_idx=device['StateIndex'], key=page_data['AccessKey']) }}" >
+                            <b>{{ device['DeviceName'] }}</b>
+                            </a>
+                        </td>
+                        <td style="vertical-align: middle;"> 
+                            {% if device['IsDeviceRunning'] %} 
+                                <span class="circle green-circle"></span>
+                            {% else %}
+                                <span class="circle black-circle"></span>
+                            {% endif %}
+                            {{ device['Status'] }}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="footer_text" style="margin-top: 10px;">
+            State Data: Most recent update at {{ page_data['LastStateUpdate'] }}, last refresh at {{ page_data['LastStateReload'] }}
+        </div>
+
     </div>
     <script 
         type="text/javascript" 

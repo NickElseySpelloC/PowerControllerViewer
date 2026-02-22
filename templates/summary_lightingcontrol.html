@@ -16,7 +16,7 @@
         <p>Status as at {{ page_data['TimeNow'] }}: {{ page_data['LastStatusMessage'] }}</p>
 
         <!-- Navigation Buttons -->
-        <div>
+        <div class="responsive full">
             <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
                class="button">
                Home
@@ -60,7 +60,8 @@
                 <tr>
                     <td>Switch States</td>
                     <td>
-                        <table>
+                        <!-- Switch states: Table for full width display -->
+                        <table class="info_table full">
                             <thead>
                                 <tr>
                                     <th>Switch Name</th>
@@ -98,6 +99,32 @@
                                     {% endfor %}
                             </tbody>
                         </table>
+
+                        <!-- Switch states: Table for mobile display display -->
+                        <table class="info_table compact">
+                            <thead>
+                                <tr>
+                                    <th>Switch Name</th>
+                                    <th>Light</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                    {% for switch in page_data['SwitchStates'] %}
+                                    <tr>
+                                        <td>{{ switch['Switch'] }}</td>
+                                        <td>  <!-- Output State -->
+                                            {% if switch['OutputState'] == 'ON' %} 
+                                                <span class="circle green-circle"></span>
+                                            {% else %}
+                                                <span class="circle black-circle"></span>
+                                            {% endif %}   
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                            </tbody>
+                        </table>
+
+
                     </td>
                 </tr>
                 {% endif %}

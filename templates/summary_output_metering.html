@@ -15,69 +15,71 @@
         <h1>{{page_data['DeviceName']}}</h1>
 
         <!-- Navigation Buttons -->
-        <div style="display: flex; align-items: center; margin-bottom: 20px;">
-            <div>
-                <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-                   class="button">
-                   Home
-                </a>
-                {% if page_data['NextIndex'] is not none %}
-                    <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
+        <div class="responsive full">
+            <div style="display: flex; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
                     class="button">
-                    Go to {{ page_data['NextDeviceName'] }} >>>
+                    Home
                     </a>
-                {% endif %}
-            </div>
-
-            &nbsp;&nbsp;
-
-            <!-- Period Selection Form -->
-            <div>
-                <form id="periodForm" method="get" action="{{ url_for('views.summary') }}" style="margin: 0;"
-                    data-custom-start="{{ page_data['CustomStartDate'] or '' }}"
-                    data-custom-end="{{ page_data['CustomEndDate'] or '' }}"
-                    data-min-date="{{ page_data['FirstDate'] }}"
-                    data-max-date="{{ page_data['LastDate'] }}">
-                    <input type="hidden" name="state_idx" value="{{ page_data['CurrentIndex'] }}">
-                    {% if page_data['AccessKey'] %}
-                        <input type="hidden" name="key" value="{{ page_data['AccessKey'] }}">
+                    {% if page_data['NextIndex'] is not none %}
+                        <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
+                        class="button">
+                        Go to {{ page_data['NextDeviceName'] }} >>>
+                        </a>
                     {% endif %}
-                    
-                    <label for="periodSelect">Add Period:</label>
-                    <select id="periodSelect" name="period_idx">
-                        {% for choice in page_data['PeriodChoiceList'] %}
-                            <option value="{{ choice['ID'] }}" 
-                                    data-custom="{{ choice['Custom']|lower }}"
-                                    {% if choice['Selected'] %}selected{% endif %}>
-                                {{ choice['Name'] }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                    
-                    &nbsp;&nbsp;
-                    
-                    <label for="startDate">Start Date:</label>
-                    <input type="date" id="startDate" name="start_date" 
-                        disabled
-                        {% if page_data['CustomStartDate'] %}value="{{ page_data['CustomStartDate'] }}"{% endif %}
-                        min="{{ page_data['FirstDate'] }}" 
-                        max="{{ page_data['LastDate'] }}">
-                    
-                    &nbsp;&nbsp;
-                    
-                    <label for="endDate">End Date:</label>
-                    <input type="date" id="endDate" name="end_date" 
-                        disabled
-                        {% if page_data['CustomEndDate'] %}value="{{ page_data['CustomEndDate'] }}"{% endif %}
-                        min="{{ page_data['FirstDate'] }}" 
-                        max="{{ page_data['LastDate'] }}">
-                    
-                    &nbsp;&nbsp;
-                    
-                    <button type="submit" class="button">Submit</button>
-                </form>
-            </div>
+                </div>
 
+                &nbsp;&nbsp;
+
+                <!-- Period Selection Form -->
+                <div>
+                    <form id="periodForm" method="get" action="{{ url_for('views.summary') }}" style="margin: 0;"
+                        data-custom-start="{{ page_data['CustomStartDate'] or '' }}"
+                        data-custom-end="{{ page_data['CustomEndDate'] or '' }}"
+                        data-min-date="{{ page_data['FirstDate'] }}"
+                        data-max-date="{{ page_data['LastDate'] }}">
+                        <input type="hidden" name="state_idx" value="{{ page_data['CurrentIndex'] }}">
+                        {% if page_data['AccessKey'] %}
+                            <input type="hidden" name="key" value="{{ page_data['AccessKey'] }}">
+                        {% endif %}
+                        
+                        <label for="periodSelect">Add Period:</label>
+                        <select id="periodSelect" name="period_idx">
+                            {% for choice in page_data['PeriodChoiceList'] %}
+                                <option value="{{ choice['ID'] }}" 
+                                        data-custom="{{ choice['Custom']|lower }}"
+                                        {% if choice['Selected'] %}selected{% endif %}>
+                                    {{ choice['Name'] }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        
+                        &nbsp;&nbsp;
+                        
+                        <label for="startDate">Start Date:</label>
+                        <input type="date" id="startDate" name="start_date" 
+                            disabled
+                            {% if page_data['CustomStartDate'] %}value="{{ page_data['CustomStartDate'] }}"{% endif %}
+                            min="{{ page_data['FirstDate'] }}" 
+                            max="{{ page_data['LastDate'] }}">
+                        
+                        &nbsp;&nbsp;
+                        
+                        <label for="endDate">End Date:</label>
+                        <input type="date" id="endDate" name="end_date" 
+                            disabled
+                            {% if page_data['CustomEndDate'] %}value="{{ page_data['CustomEndDate'] }}"{% endif %}
+                            min="{{ page_data['FirstDate'] }}" 
+                            max="{{ page_data['LastDate'] }}">
+                        
+                        &nbsp;&nbsp;
+                        
+                        <button type="submit" class="button">Submit</button>
+                    </form>
+                </div>
+
+            </div>
         </div>
 
         <table>

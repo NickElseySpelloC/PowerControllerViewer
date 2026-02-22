@@ -269,9 +269,15 @@ table table th, table table td {
   .info_table.full {
     display: none;
   }
+  .output_table.full {
+    display: none;
+  }
 
   /* Show compact table on mobile */
   .info_table.compact {
+    display: table;
+  }
+  .output_table.compact {
     display: table;
   }
 }
@@ -281,8 +287,54 @@ table table th, table table td {
   .info_table.compact {
     display: none;
   }
+  .output_table.compact {
+    display: none;
+  }
   
   .info_table.full {
     display: table;
   }
+    .output_table.full {
+        display: table;
+    }
+}
+
+/*
+    Responsive visibility helpers for block elements (e.g. <div>)
+
+    Usage:
+        <div class="responsive full"> ... </div>      (shown on desktop)
+        <div class="responsive compact"> ... </div>   (shown on mobile)
+
+    Notes:
+    - Opt-in via the "responsive" class so existing uses of "full" / "compact"
+        elsewhere in the app are not affected.
+    - Uses the same breakpoint as the table rules above.
+*/
+.responsive.full {
+        display: block;
+}
+
+.responsive.compact {
+        display: none;
+}
+
+@media (max-width: 480px) {
+        .responsive.full {
+                display: none !important;
+        }
+
+        .responsive.compact {
+                display: block !important;
+        }
+}
+
+@media (min-width: 481px) {
+        .responsive.compact {
+                display: none !important;
+        }
+
+        .responsive.full {
+                display: block !important;
+        }
 }

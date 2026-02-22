@@ -61,7 +61,7 @@
             </table>
 
             <!-- Display the current state of each Shelly output device -->
-            <table class="output_table">
+            <table class="output_table full">
                 <tbody>
                     {% if page_data['ShellyDevices'] %}
                         <tr>
@@ -89,9 +89,6 @@
                         <tr>
                             <td class="info_td_mobile"> 
                                 <span class="info_text_name">{{ device['Name'] }}</span>
-                                {% if device['HaveTemperature'] %}
-                                    <span class="info_text_time"> ({{ device['LastLoggedTime'] }})</span>
-                                {% endif %}
                             </td>
                             <td class="info_td_mobile"> 
                                 {% if device['HaveTemperature'] %}
@@ -110,7 +107,7 @@
         
     </div>
     <!-- Navigation Buttons -->
-    <div>
+    <div class="responsive full">
         <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
             class="button">
             Home

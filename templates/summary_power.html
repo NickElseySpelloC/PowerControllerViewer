@@ -16,7 +16,7 @@
         <p>Status as at {{ page_data['TimeNow'] }}: {{ page_data['StatusMessage'] }}</p>
 
         <!-- Navigation Buttons -->
-        <div>
+        <div class="responsive full">
             <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
                class="button">
                Home
