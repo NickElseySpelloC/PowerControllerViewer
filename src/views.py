@@ -74,7 +74,7 @@ def home():  # noqa: PLR0912, PLR0915
             "AccessKey": config.get("Website", "AccessKey"),
             "RefreshDelay": config.get("Website", "PageAutoRefresh") or 0,
             "CurrentIndex": state_idx,
-            "TimeNow": DateHelper.now_str(),
+            "TimeNow": helper.format_date_with_ordinal(DateHelper.now(), True),
             "LastStateUpdate": helper.format_date_with_ordinal(helper.get_latest_state_modification_time(), True),
             "LastStateReload": helper.format_date_with_ordinal(helper.get_last_state_reload(), True),
             "Devices": [],

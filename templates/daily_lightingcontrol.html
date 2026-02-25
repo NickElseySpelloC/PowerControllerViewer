@@ -17,24 +17,21 @@
         <!-- Navigation Buttons -->
         <div>
             <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-               class="button">
+               class="btn">
                Home
             </a>
             <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=page_data['PreviousDay'], key=page_data['AccessKey']) }}" 
-               class="button{% if page_data['PreviousDay'] is none %} disabled{% endif %}">
+               class="btn{% if page_data['PreviousDay'] is none %} btn--disabled{% endif %}">
                 Previous Day
             </a>
             <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=page_data['NextDay'], key=page_data['AccessKey']) }}" 
-               class="button{% if page_data['NextDay'] is none %} disabled{% endif %}"">
+               class="btn{% if page_data['NextDay'] is none %} btn--disabled{% endif %}">
                 Next Day
             </a>
             <a href="{{ url_for('views.summary', state_idx=page_data['CurrentIndex'], key=page_data['AccessKey']) }}" 
-                class="button">
+                class="btn">
                 Back to Summary
             </a>
-    
-
-
         </div>
 
         <!-- Events Table -->
@@ -56,9 +53,9 @@
                             <td>{{ event['Trigger'] }}</td>
                             <td>
                                 {% if event['State'] == 'ON' %} 
-                                    <span class="circle green-circle"></span> On
+                                    <span class="status-indicator status-indicator--active"></span> On
                                 {% else %}
-                                    <span class="circle black-circle"></span> Off
+                                    <span class="status-indicator status-indicator--inactive"></span> Off
                                 {% endif %}   
                             </td>
                         </tr>

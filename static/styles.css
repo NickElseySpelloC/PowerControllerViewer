@@ -1,4 +1,7 @@
-/* General styles */
+/* ===========================
+   BASE STYLES
+   =========================== */
+
 body {
     font-family: 'Arial', sans-serif;
     margin: 20px;
@@ -6,13 +9,17 @@ body {
     color: #333;
 }
 
-h1 {
+h1, h2 {
     color: #444;
 }
 
 a {
-    text-decoration: none;    
+    text-decoration: none;
 }
+
+/* ===========================
+   TABLE STYLES
+   =========================== */
 
 table {
     border-collapse: collapse;
@@ -20,10 +27,12 @@ table {
     background-color: #fff;
 }
 
-th, td {
+th,
+td {
     border: 1px solid #ddd;
     padding: 10px;
     text-align: left;
+    vertical-align: top;
 }
 
 th {
@@ -35,23 +44,51 @@ tr:hover {
     background-color: #f1f1f1;
 }
 
-td {
-    vertical-align: top;
-}
-
 /* Nested table styles */
 table table {
     width: 100%;
     margin: 5px;
 }
 
-table table th, table table td {
+table table th,
+table table td {
     border: 1px solid #ccc;
     padding: 5px;
 }
 
-/* Button styles */
-.button {
+/* Borderless table */
+.table--borderless {
+    border: none;
+    margin: 0;
+    padding: 0;
+}
+
+.table--borderless td,
+.table--borderless th {
+    border: none;
+}
+
+/* Table cell alignment utilities */
+.table__cell--center {
+    vertical-align: middle;
+    text-align: center;
+}
+
+.table__cell--left {
+    vertical-align: middle;
+    text-align: left;
+}
+
+.table__cell--right {
+    vertical-align: middle;
+    text-align: right;
+}
+
+/* ===========================
+   BUTTON STYLES
+   =========================== */
+
+.btn {
     display: inline-block;
     padding: 5px 10px;
     margin: 5px;
@@ -65,18 +102,23 @@ table table th, table table td {
     text-align: center;
 }
 
-.button:hover {
+.btn:hover {
     background-color: #0056b3;
 }
 
-.button.disabled {
+.btn--disabled,
+.btn.disabled {
     background-color: #cccccc;
     color: #666666;
     cursor: not-allowed;
     pointer-events: none;
 }
 
-.circle {
+/* ===========================
+   STATUS INDICATOR
+   =========================== */
+
+.status-indicator {
     display: inline-block;
     width: 1.2em;
     height: 1.2em;
@@ -85,256 +127,128 @@ table table th, table table td {
     margin: 0 4px;
 }
 
-.green-circle {
-    background-color: #00c853; /* similar to 🟢 */
+.status-indicator--active {
+    background-color: #00c853;
 }
 
-.black-circle {
+.status-indicator--inactive {
     background-color: #000000;
 }
 
-.footer_text {
+/* ===========================
+   FOOTER
+   =========================== */
+
+.footer-text {
     font-size: 0.8em;
-    color: #1d1c1c8e;
+    color: rgba(29, 28, 28, 0.56);
     margin-top: 20px;
-} 
-.info_table {
-    border: none;
-    width: 100%;
-    text-align: center;
-    margin: 0px;
-    padding: 0px;
 }
 
-.output_table {
-    border: none;
-    /* width: 100%; */
-    text-align: left;
-    margin: 0px;
-}
-/* Table element styles for the desktop temp probe display */
+/* ===========================
+   TEMPERATURE DISPLAY
+   =========================== */
 
-.info_tr {
-    margin: 0px;
-    padding: 0px;
-}
-.info_td {
-    vertical-align: middle;
-    text-align: center;
-    border: none;
-    margin: 0px;
-    padding: 0px;
-}
-
-.info_td_left {
-    vertical-align: middle;
-    text-align: left;
-    border: none;
-}
-
-.info_td_right {
-    vertical-align: middle;
-    text-align: right;
-    border: none;
-}
-
-.info_text_name {
-    font-size: 4.0vw; /* Fallback for older browsers */
+.temp-display__name {
     font-size: clamp(1rem, 2.5vw, 6rem);
     text-align: center;
     color: blue;
 }
 
-/* For iOS 12 and older browsers, use media queries */
-@media (max-width: 480px) {
-    .info_text_name {
-        font-size: 1rem; /* Min on small screens */
-    }
-}
-
-@media (min-width: 2400px) {
-    .info_text_name {
-        font-size: 6rem; /* Max on very large screens */
-    }
-}
-
-.info_text_time {
-    font-size: 2.5vw;
+.temp-display__time {
     font-size: clamp(0.7rem, 0.9vw, 1.2rem);
     color: rgb(41, 39, 39);
 }
 
-@media (max-width: 480px) {
-    .info_text_time {
-        font-size: 0.7rem;
-    }
-}
-
-@media (min-width: 1333px) {
-    .info_text_time {
-        font-size: 1.2rem;
-    }
-}
-
-.info_text_temp {
-    font-size: 12.0vw;
+.temp-display__value {
     font-size: clamp(1.0rem, 7.0vw, 16.0rem);
     text-align: center;
 }
 
-.info_text_temp_decimal {
-    font-size: 6.0vw;
+.temp-display__decimal {
     font-size: clamp(1.0rem, 3.5vw, 10.0rem);
     text-align: center;
 }
 
-@media (max-width: 480px) {
-    .info_text_temp {
-        font-size: 1.5rem;
-    }
-    .info_text_temp_decimal {
-        font-size: 1.0rem;
-    }
-}
-
-@media (min-width: 2285px) {
-    .info_text_temp {
-        font-size: 16.0rem;
-    }
-    .info_text_temp_decimal {
-        font-size: 10.0rem;
-    }
-}
-
-.info_text_temp_unit {
+.temp-display__unit {
     vertical-align: top;
-    font-size: 2.0vw;
     font-size: clamp(1.0rem, 2.0vw, 4.0rem);
 }
 
-@media (max-width: 480px) {
-    .info_text_temp_unit {
-        font-size: 1.0rem;
-    }
-}
-
-@media (min-width: 2000px) {
-    .info_text_temp_unit {
-        font-size: 4.0rem;
-    }
-}
-
-.info_text_temp_na {
-    font-size: 3.5vw;
+.temp-display__not-available {
     font-size: clamp(1.0rem, 3.5vw, 8rem);
 }
 
-@media (max-width: 480px) {
-    .info_text_temp_na {
-        font-size: 1.0rem;
-    }
-}
-
-@media (min-width: 2285px) {
-    .info_text_temp_na {
-        font-size: 8rem;
-    }
-}
-
-.info_td_chart {
+.temp-display__chart-container {
     vertical-align: middle;
     text-align: center;
     border: none;
 }
 
-.temp_probe_chart {
-    margin-top: 0px; 
+.temp-display__chart {
+    margin-top: 0;
     width: 90%;
     height: auto;
-    /* max-height: 400px; */
     object-fit: contain;
 }
 
-/* Table element styles for the mobile temp probe display */
-.info_td_mobile {
-    vertical-align: middle;
-    text-align: left;
-    border: none;
+/* ===========================
+   RESPONSIVE UTILITIES
+   =========================== */
+
+/* Desktop-only content */
+.responsive--desktop {
+    display: block;
 }
 
+/* Mobile-only content */
+.responsive--mobile {
+    display: none;
+}
 
-/* Mobile-specific adjustments */
+/* Table responsive variants */
+.table--desktop {
+    display: table;
+}
+
+.table--mobile {
+    display: none;
+}
+
+/* Mobile breakpoint */
 @media (max-width: 480px) {
-  /* Hide the full table on mobile */
-  .info_table.full {
-    display: none;
-  }
-  .output_table.full {
-    display: none;
-  }
+    .responsive--desktop {
+        display: none !important;
+    }
 
-  /* Show compact table on mobile */
-  .info_table.compact {
-    display: table;
-  }
-  .output_table.compact {
-    display: table;
-  }
-}
+    .responsive--mobile {
+        display: block !important;
+    }
 
-/* Hide compact table on desktop */
-@media (min-width: 481px) {
-  .info_table.compact {
-    display: none;
-  }
-  .output_table.compact {
-    display: none;
-  }
-  
-  .info_table.full {
-    display: table;
-  }
-    .output_table.full {
+    .table--desktop {
+        display: none;
+    }
+
+    .table--mobile {
         display: table;
     }
 }
 
-/*
-    Responsive visibility helpers for block elements (e.g. <div>)
-
-    Usage:
-        <div class="responsive full"> ... </div>      (shown on desktop)
-        <div class="responsive compact"> ... </div>   (shown on mobile)
-
-    Notes:
-    - Opt-in via the "responsive" class so existing uses of "full" / "compact"
-        elsewhere in the app are not affected.
-    - Uses the same breakpoint as the table rules above.
-*/
-.responsive.full {
-        display: block;
-}
-
-.responsive.compact {
-        display: none;
-}
-
-@media (max-width: 480px) {
-        .responsive.full {
-                display: none !important;
-        }
-
-        .responsive.compact {
-                display: block !important;
-        }
-}
-
+/* Desktop breakpoint */
 @media (min-width: 481px) {
-        .responsive.compact {
-                display: none !important;
-        }
+    .responsive--mobile {
+        display: none !important;
+    }
 
-        .responsive.full {
-                display: block !important;
-        }
+    .responsive--desktop {
+        display: block !important;
+    }
+
+    .table--mobile {
+        display: none;
+    }
+
+    .table--desktop {
+        display: table;
+    }
 }

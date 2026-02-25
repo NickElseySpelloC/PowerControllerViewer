@@ -14,8 +14,8 @@
     <div>
         <h2>Select a device to view</h2>
         
-        <!-- Table for full width display -->
-        <table class="info_table full">
+        <!-- Table for desktop display -->
+        <table class="table--borderless table--desktop">
             <thead>
                 <tr>
                     <th>Device</th>
@@ -27,18 +27,18 @@
             <tbody>
                 {% for device in page_data['Devices'] %}
                     <tr>
-                        <td style="vertical-align: middle;">
-                            <a href="{{ url_for('views.summary', state_idx=device['StateIndex'], key=page_data['AccessKey']) }}" >
-                            <b>{{ device['DeviceName'] }}</b>
+                        <td class="table__cell--left">
+                            <a href="{{ url_for('views.summary', state_idx=device['StateIndex'], key=page_data['AccessKey']) }}">
+                                <b>{{ device['DeviceName'] }}</b>
                             </a>
                         </td>
-                        <td style="vertical-align: middle;"> {{ device['DeviceDescription'] }}</td>
-                        <td style="vertical-align: middle;"> {{ device['LastCheck'][:-3] }}</td>
-                        <td style="vertical-align: middle;"> 
-                            {% if device['IsDeviceRunning'] %} 
-                                <span class="circle green-circle"></span>
+                        <td class="table__cell--left">{{ device['DeviceDescription'] }}</td>
+                        <td class="table__cell--left">{{ device['LastCheck'][:-3] }}</td>
+                        <td class="table__cell--left">
+                            {% if device['IsDeviceRunning'] %}
+                                <span class="status-indicator status-indicator--active"></span>
                             {% else %}
-                                <span class="circle black-circle"></span>
+                                <span class="status-indicator status-indicator--inactive"></span>
                             {% endif %}
                             {{ device['Status'] }}
                         </td>
@@ -48,7 +48,7 @@
         </table>
 
         <!-- Table for mobile display -->
-        <table class="info_table compact">        
+        <table class="table--borderless table--mobile">
             <thead>
                 <tr>
                     <th>Device</th>
@@ -58,16 +58,16 @@
             <tbody>
                 {% for device in page_data['Devices'] %}
                     <tr>
-                        <td style="vertical-align: middle;">
-                            <a href="{{ url_for('views.summary', state_idx=device['StateIndex'], key=page_data['AccessKey']) }}" >
-                            <b>{{ device['DeviceName'] }}</b>
+                        <td class="table__cell--left">
+                            <a href="{{ url_for('views.summary', state_idx=device['StateIndex'], key=page_data['AccessKey']) }}">
+                                <b>{{ device['DeviceName'] }}</b>
                             </a>
                         </td>
-                        <td style="vertical-align: middle;"> 
-                            {% if device['IsDeviceRunning'] %} 
-                                <span class="circle green-circle"></span>
+                        <td class="table__cell--left">
+                            {% if device['IsDeviceRunning'] %}
+                                <span class="status-indicator status-indicator--active"></span>
                             {% else %}
-                                <span class="circle black-circle"></span>
+                                <span class="status-indicator status-indicator--inactive"></span>
                             {% endif %}
                             {{ device['Status'] }}
                         </td>
@@ -76,8 +76,8 @@
             </tbody>
         </table>
 
-        <div class="footer_text" style="margin-top: 10px;">
-            State Data: Most recent update at {{ page_data['LastStateUpdate'] }}, last refresh at {{ page_data['LastStateReload'] }}
+        <div class="footer-text">
+            State Data: Most recent update at {{ page_data['LastStateUpdate'] }}, time now {{ page_data['TimeNow'] }}
         </div>
 
     </div>

@@ -14,31 +14,31 @@
     <div>        
         <!-- List of temp probes. List each probe across the page -->
         <div>
-            <!-- Table for full width display -->
-            <table class="info_table full">
+            <!-- Table for desktop display -->
+            <table class="table--borderless table--desktop">
                 <tbody>
-                    <tr class="info_tr">
+                    <tr>
                         {% for device in page_data['TempProbes'] %}
-                            <td class="info_td"> 
-                                <span class="info_text_name">{{ device['Name'] }}</span>
+                            <td class="table__cell--center"> 
+                                <span class="temp-display__name">{{ device['Name'] }}</span>
                                 {% if device['HaveTemperature'] %}
-                                    <span class="info_text_time"> ({{ device['LastReadingTime'] }})</span>
+                                    <span class="temp-display__time"> ({{ device['LastReadingTime'] }})</span>
                                 {% endif %}
                             </td>
                         {% endfor %}
                     </tr>
 
-                    <tr class="info_tr">
+                    <tr>
                         {% for device in page_data['TempProbes'] %}
                             {% if device['HaveTemperature'] %}
-                                <td class="info_td"> 
-                                    <span class="info_text_temp">{{ device['TemperatureInteger'] }}</span>
-                                    <span class="info_text_temp_decimal">.{{ device['TemperatureDecimal'] }}</span>
-                                    <span class="info_text_temp_unit">°C</span>
+                                <td class="table__cell--center"> 
+                                    <span class="temp-display__value">{{ device['TemperatureInteger'] }}</span>
+                                    <span class="temp-display__decimal">.{{ device['TemperatureDecimal'] }}</span>
+                                    <span class="temp-display__unit">°C</span>
                                 </td>
                             {% else %}
-                                <td class="info_td"> 
-                                    <span class="info_text_temp_na">N/A</span>
+                                <td class="table__cell--center"> 
+                                    <span class="temp-display__not-available">N/A</span>
                                 </td>
                             {% endif %}
                         {% endfor %}
@@ -46,12 +46,12 @@
                     <!-- Display each temp probe chart (if any) -->
                     {% if page_data['TempProbeCharts'] %}
                         {% for chart in page_data['TempProbeCharts'] %}
-                            <tr class="info_tr">
-                                <td class="info_td_chart" colspan="{{ page_data['TempProbes']|length }}">
+                            <tr>
+                                <td class="temp-display__chart-container" colspan="{{ page_data['TempProbes']|length }}">
                                     <img 
                                         src="{{ url_for('static', filename=chart) }}" 
                                         alt="Temperature Probe Chart" 
-                                        class="temp_probe_chart"
+                                        class="temp-display__chart"
                                     >
                                 </td>
                             </tr>
@@ -61,19 +61,19 @@
             </table>
 
             <!-- Display the current state of each Shelly output device -->
-            <table class="output_table full">
+            <table class="table--borderless table--desktop">
                 <tbody>
                     {% if page_data['ShellyDevices'] %}
                         <tr>
                             {% for device in page_data['ShellyDevices'] %}
-                                <td class="info_td_right">
+                                <td class="table__cell--right">
                                     {{ device['Name'] }}
                                 </td>
-                                <td class="info_td_left">
+                                <td class="table__cell--left">
                                     {% if device['IsOn'] %} 
-                                        <span class="circle green-circle"></span>
+                                        <span class="status-indicator status-indicator--active"></span>
                                     {% else %}
-                                        <span class="circle black-circle"></span>
+                                        <span class="status-indicator status-indicator--inactive"></span>
                                     {% endif %}
                                 </td>                                
                             {% endfor %}
@@ -83,19 +83,19 @@
             </table>
 
             <!-- Table for mobile display -->
-            <table class="info_table compact">
+            <table class="table--borderless table--mobile">
                 <tbody>
                     {% for device in page_data['TempProbes'] %}
                         <tr>
-                            <td class="info_td_mobile"> 
-                                <span class="info_text_name">{{ device['Name'] }}</span>
+                            <td class="table__cell--left"> 
+                                <span class="temp-display__name">{{ device['Name'] }}</span>
                             </td>
-                            <td class="info_td_mobile"> 
+                            <td class="table__cell--left"> 
                                 {% if device['HaveTemperature'] %}
-                                    <span class="info_text_temp">{{ device['Temperature'] }}</span>
-                                    <span class="info_text_temp_unit">&nbsp;°C</span>
+                                    <span class="temp-display__value">{{ device['Temperature'] }}</span>
+                                    <span class="temp-display__unit">&nbsp;°C</span>
                                 {% else %}
-                                    <span class="info_text_temp_na">N/A</span>
+                                    <span class="temp-display__not-available">N/A</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -107,20 +107,20 @@
         
     </div>
     <!-- Navigation Buttons -->
-    <div class="responsive full">
+    <div class="responsive--desktop">
         <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-            class="button">
+            class="btn">
             Home
         </a>
         {% if page_data['NextIndex'] is not none %}
             <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
-            class="button">
+            class="btn">
             Go to {{ page_data['NextDeviceName'] }} >>>
             </a>
         {% endif %}
         <span style="margin-left: 20px; font-size: 1.7rem">{{ page_data['CurrentTime'] }}</span>
     </div>    
-    <div class="footer_text" style="margin-top: 10px;">
+    <div class="footer-text">
         Last updated {{ page_data['LastCheck'] }}
     </div>
     <script 

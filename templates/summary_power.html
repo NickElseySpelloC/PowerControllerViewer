@@ -16,19 +16,19 @@
         <p>Status as at {{ page_data['TimeNow'] }}: {{ page_data['StatusMessage'] }}</p>
 
         <!-- Navigation Buttons -->
-        <div class="responsive full">
+        <div class="responsive--desktop">
             <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-               class="button">
+               class="btn">
                Home
             </a>
             {% if page_data['NextIndex'] is not none %}
                 <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
-                class="button">
+                class="btn">
                 Go to {{ page_data['NextDeviceName'] }} >>>
                 </a>
             {% endif %}
             <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=0, key=page_data['AccessKey']) }}" 
-               class="button">
+               class="btn">
                View {{page_data['DeviceName']}} Daily Data
             </a>
         </div>
@@ -51,9 +51,9 @@
                     <td>Pump Status</td>
                     <td>
                         {% if page_data['IsDeviceRunning'] %} 
-                            <span class="circle green-circle"></span>
+                            <span class="status-indicator status-indicator--active"></span>
                         {% else %}
-                            <span class="circle black-circle"></span>
+                            <span class="status-indicator status-indicator--inactive"></span>
                         {% endif %}   
                         {{ page_data['PumpStatus'] }}
                     </td>

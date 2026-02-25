@@ -16,20 +16,20 @@
         <p>Status as at {{ page_data['TimeNow'] }}: {{ page_data['LastStatusMessage'] }}</p>
 
         <!-- Navigation Buttons -->
-        <div class="responsive full">
+        <div class="responsive--desktop">
             <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-               class="button">
+               class="btn">
                Home
             </a>
             {% if page_data['NextIndex'] is not none %}
                 <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
-                class="button">
+                class="btn">
                 Go to {{ page_data['NextDeviceName'] }} >>>
                 </a>
             {% endif %}
             {% if page_data['HaveEvents'] %}
                 <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=0, key=page_data['AccessKey']) }}" 
-                class="button">
+                class="btn">
                 View {{page_data['DeviceName']}} Daily Events
                 </a>
             {% endif %}            
@@ -60,8 +60,8 @@
                 <tr>
                     <td>Switch States</td>
                     <td>
-                        <!-- Switch states: Table for full width display -->
-                        <table class="info_table full">
+                        <!-- Switch states: Table for desktop display -->
+                        <table class="table--borderless table--desktop">
                             <thead>
                                 <tr>
                                     <th>Switch Name</th>
@@ -80,9 +80,9 @@
                                         <td>  <!-- Input State -->
                                             {% if switch['InputState'] %} 
                                                 {% if switch['InputState'] == 'ON' %} 
-                                                    <span class="circle green-circle"></span>
+                                                    <span class="status-indicator status-indicator--active"></span>
                                                 {% else %}
-                                                    <span class="circle black-circle"></span>
+                                                    <span class="status-indicator status-indicator--inactive"></span>
                                                 {% endif %}   
                                             {% else %}
                                                 <span>&nbsp;</span>
@@ -90,9 +90,9 @@
                                         </td>
                                         <td>  <!-- Output State -->
                                             {% if switch['OutputState'] == 'ON' %} 
-                                                <span class="circle green-circle"></span>
+                                                <span class="status-indicator status-indicator--active"></span>
                                             {% else %}
-                                                <span class="circle black-circle"></span>
+                                                <span class="status-indicator status-indicator--inactive"></span>
                                             {% endif %}   
                                         </td>
                                     </tr>
@@ -100,8 +100,8 @@
                             </tbody>
                         </table>
 
-                        <!-- Switch states: Table for mobile display display -->
-                        <table class="info_table compact">
+                        <!-- Switch states: Table for mobile display -->
+                        <table class="table--borderless table--mobile">
                             <thead>
                                 <tr>
                                     <th>Switch Name</th>
@@ -114,9 +114,9 @@
                                         <td>{{ switch['Switch'] }}</td>
                                         <td>  <!-- Output State -->
                                             {% if switch['OutputState'] == 'ON' %} 
-                                                <span class="circle green-circle"></span>
+                                                <span class="status-indicator status-indicator--active"></span>
                                             {% else %}
-                                                <span class="circle black-circle"></span>
+                                                <span class="status-indicator status-indicator--inactive"></span>
                                             {% endif %}   
                                         </td>
                                     </tr>

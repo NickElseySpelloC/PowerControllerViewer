@@ -15,16 +15,16 @@
         <h1>{{page_data['DeviceName']}}</h1>
 
         <!-- Navigation Buttons -->
-        <div class="responsive full">
+        <div class="responsive--desktop">
             <div style="display: flex; align-items: center; margin-bottom: 20px;">
                 <div>
                     <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-                    class="button">
+                    class="btn">
                     Home
                     </a>
                     {% if page_data['NextIndex'] is not none %}
                         <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
-                        class="button">
+                        class="btn">
                         Go to {{ page_data['NextDeviceName'] }} >>>
                         </a>
                     {% endif %}
@@ -75,7 +75,7 @@
                         
                         &nbsp;&nbsp;
                         
-                        <button type="submit" class="button">Submit</button>
+                        <button type="submit" class="btn">Submit</button>
                     </form>
                 </div>
 
