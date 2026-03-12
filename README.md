@@ -323,7 +323,7 @@ At the end you will see something like this:
 ### Add the SSL certificate keys to your nginx configuration file
 Edit the file:
 ```bash
-sudo nano /etc/nginx/sites-available/PowerControllerViewer`
+sudo nano /etc/nginx/sites-available/PowerControllerViewer
 ```
 
 And change the file so that it now looks like this:
@@ -341,8 +341,8 @@ server {
     listen 443 ssl;
     server_name power.elseyworld.com;
 
-    ssl_certificate /etc/letsencrypt/live/power.elseyworld.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/power.elseyworld.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/power.abc.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/power.abc.com/privkey.pem;
 
     location / {
         proxy_pass http://127.0.0.1:8000;
@@ -355,10 +355,52 @@ server {
 ```
 
 Save the file and test the configuration:
-`sudo nginx -t`
+```bash
+sudo nginx -t
+```
 
 Reload the configuration:
-`sudo systemctl reload nginx`
+```bash
+sudo systemctl reload nginx
+```
+
+### Manual renewal
+If you're having problems with the certbot auto-renewing your SSL certificate:
+
+First, make sure the directory exists:
+
+```bash
+sudo mkdir -p /var/www/certbot/.well-known/acme-challenge
+sudo chown -R www-data:www-data /var/www/certbot
+```
+
+Test nginx serving from it:
+```bash
+echo test | sudo tee /var/www/certbot/.well-known/acme-challenge/test-file
+```
+
+Then from outside your network, or using mobile data:
+
+```bash
+curl http://power.abc.com/.well-known/acme-challenge/test-file
+```
+
+You should get:
+
+```bash
+test
+```
+
+If that works, request/renew with:
+
+```bash
+sudo certbot certonly --webroot -w /var/www/certbot -d power.elseyworld.com
+```
+Then test renewal:
+
+```bash
+sudo certbot renew --dry-run
+```
 
 ### Test the HTTPS connection
 Open up port forwarding on your route for port 443 externally to port 443 internally. Now got to https://power.abc.com from an external web browser and make sure it works. 
