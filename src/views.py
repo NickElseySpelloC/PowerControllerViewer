@@ -5,7 +5,7 @@ import json
 import operator
 
 from flask import Blueprint, jsonify, redirect, render_template, request, url_for
-from sc_utility import DateHelper
+from sc_foundation import DateHelper
 from werkzeug.datastructures import MultiDict
 
 views = Blueprint(__name__, "views")

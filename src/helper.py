@@ -15,7 +15,7 @@ from typing import Any
 from urllib.parse import quote
 
 import matplotlib as mpl
-from sc_utility import DateHelper, JSONEncoder, SCCommon, SCConfigManager, SCLogger
+from sc_foundation import DateHelper, JSONEncoder, SCCommon, SCConfigManager, SCLogger
 from werkzeug.datastructures import MultiDict
 
 mpl.use("Agg")  # Use non-interactive backend for server environments

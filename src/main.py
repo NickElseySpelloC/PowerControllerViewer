@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from flask import Flask, request, send_from_directory
-from sc_utility import SCConfigManager, SCLogger
+from sc_foundation import SCConfigManager, SCLogger
 
 from config_schemas import ConfigSchema
 from helper import PowerControllerViewer
