@@ -60,12 +60,12 @@
                 </tbody>
             </table>
 
-            <!-- Display the current state of each Shelly output device -->
+            <!-- Display the current state of each smart output device -->
             <table class="table--borderless table--desktop">
                 <tbody>
-                    {% if page_data['ShellyDevices'] %}
+                    {% if page_data['SmartDevices'] %}
                         <tr>
-                            {% for device in page_data['ShellyDevices'] %}
+                            {% for device in page_data['SmartDevices'] %}
                                 <td class="table__cell--right">
                                     {{ device['Name'] }}
                                 </td>

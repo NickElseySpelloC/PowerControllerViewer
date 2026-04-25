@@ -108,8 +108,9 @@ def home():  # noqa: PLR0912, PLR0915
             device["Status"] = f"{on_count} lights are on"
         elif state_file_type == "PowerController":
             device["IsDeviceRunning"] = helper.get_state(state_idx, "Output", "IsOn", default=False)
-            if helper.get_state(state_idx, "Output", "Type", default="") == "shelly":
-                # Fully support Shelly switched devices
+            output_type = helper.get_state(state_idx, "Output", "Type", default="")
+            if output_type in {"smart device", "shelly"}:
+                # Fully support smart device switched devices
                 remaining_runtime = helper.hours_to_string(helper.get_state(state_idx, "Output", "RunPlan", "RemainingHours", default=0))
                 output_start_time = None
                 if device["IsDeviceRunning"]:
@@ -475,7 +476,7 @@ def build_temp_probes_homepage(state_idx: int, state_next_idx: int | None, debug
             "DebugMessage": debug_message,
             "LastCheck": helper.format_date_with_ordinal(last_save_time, True),
             "TempProbes": temp_probe_summary,
-            "ShellyDevices": get_shelly_output_info(),
+            "SmartDevices": get_smart_device_output_info(),
             "TempProbeCharts": state_data.get("TempProbeCharts"),
             "CurrentTime": DateHelper.now().strftime("Time: %H:%M:%S"),
             }
@@ -987,21 +988,21 @@ def submit_data():  # noqa: PLR0912
     return jsonify({"message": "Data received and validated successfully."}), 200
 
 
-def get_shelly_output_info() -> list[dict]:
-    """Get a list of Shelly device output information.
+def get_smart_device_output_info() -> list[dict]:
+    """Get a list of smart device output information.
 
     Returns:
-        list[dict]: A list of dictionaries containing Shelly device output information.
+        list[dict]: A list of dictionaries containing smart device output information.
     """
     assert helper is not None, "Helper instance is not initialized."
 
-    shelly_devices = []
+    smart_devices = []
     for state in helper.state_items:
         assert isinstance(state, dict)
-        if state.get("StateFileType") == "PowerController" and state.get("Output", {}).get("Type") == "shelly":
-            shelly_info = {
+        if state.get("StateFileType") == "PowerController" and state.get("Output", {}).get("Type") in {"shelly", "smart device"}:
+            smart_device_info = {
                 "Name": state.get("DeviceName", "Unknown"),
                 "IsOn": state.get("Output", {}).get("IsOn", False),
             }
-            shelly_devices.append(shelly_info)
-    return shelly_devices
+            smart_devices.append(smart_device_info)
+    return smart_devices
