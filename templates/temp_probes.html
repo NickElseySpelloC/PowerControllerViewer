@@ -1,131 +1,156 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% if page_data['RefreshDelay'] > 0 %}
-        <meta http-equiv="refresh" content="{{page_data['RefreshDelay']}}">
-    {% endif %}
-    <title>{{page_data['DeviceName']}}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body>
-    <div>        
-        <!-- List of temp probes. List each probe across the page -->
-        <div>
-            <!-- Table for desktop display -->
-            <table class="table--borderless table--desktop">
-                <tbody>
-                    <tr>
-                        {% for device in page_data['TempProbes'] %}
-                            <td class="table__cell--center"> 
-                                <span class="temp-display__name">{{ device['Name'] }}</span>
-                                {% if device['HaveTemperature'] %}
-                                    <span class="temp-display__time"> ({{ device['LastReadingTime'] }})</span>
-                                {% endif %}
-                            </td>
-                        {% endfor %}
-                    </tr>
+{% extends "_base.html" %}
 
-                    <tr>
-                        {% for device in page_data['TempProbes'] %}
-                            {% if device['HaveTemperature'] %}
-                                <td class="table__cell--center"> 
-                                    <span class="temp-display__value">{{ device['TemperatureInteger'] }}</span>
-                                    <span class="temp-display__decimal">.{{ device['TemperatureDecimal'] }}</span>
-                                    <span class="temp-display__unit">°C</span>
-                                </td>
-                            {% else %}
-                                <td class="table__cell--center"> 
-                                    <span class="temp-display__not-available">N/A</span>
-                                </td>
-                            {% endif %}
-                        {% endfor %}
-                    </tr>
-                    <!-- Display each temp probe chart (if any) -->
-                    {% if page_data['TempProbeCharts'] %}
-                        {% for chart in page_data['TempProbeCharts'] %}
-                            <tr>
-                                <td class="temp-display__chart-container" colspan="{{ page_data['TempProbes']|length }}">
-                                    <img 
-                                        src="{{ url_for('static', filename=chart) }}" 
-                                        alt="Temperature Probe Chart" 
-                                        class="temp-display__chart"
-                                    >
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    {% endif %}
-                </tbody>
-            </table>
+{% block title %}{{ page_data.DeviceName }}{% endblock %}
 
-            <!-- Display the current state of each smart output device -->
-            <table class="table--borderless table--desktop">
-                <tbody>
-                    {% if page_data['SmartDevices'] %}
-                        <tr>
-                            {% for device in page_data['SmartDevices'] %}
-                                <td class="table__cell--right">
-                                    {{ device['Name'] }}
-                                </td>
-                                <td class="table__cell--left">
-                                    {% if device['IsOn'] %} 
-                                        <span class="status-indicator status-indicator--active"></span>
-                                    {% else %}
-                                        <span class="status-indicator status-indicator--inactive"></span>
-                                    {% endif %}
-                                </td>                                
-                            {% endfor %}
-                        </tr>
-                    {% endif %}
-            </tbody>
-            </table>
+{% block head %}
+{% if page_data.ChartsEnabled %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+{% endif %}
+{% endblock %}
 
-            <!-- Table for mobile display -->
-            <table class="table--borderless table--mobile">
-                <tbody>
-                    {% for device in page_data['TempProbes'] %}
-                        <tr>
-                            <td class="table__cell--left"> 
-                                <span class="temp-display__name">{{ device['Name'] }}</span>
-                            </td>
-                            <td class="table__cell--left"> 
-                                {% if device['HaveTemperature'] %}
-                                    <span class="temp-display__value">{{ device['Temperature'] }}</span>
-                                    <span class="temp-display__unit">&nbsp;°C</span>
-                                {% else %}
-                                    <span class="temp-display__not-available">N/A</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>            
-        </div>
+{% block body %}
+<div class="nav-bar">
+  <a href="{{ page_data.home_url }}" class="btn">Home</a>
+  {% if page_data.next_url %}
+  <a href="{{ page_data.next_url }}" class="btn">{{ page_data.NextDeviceName }} &rsaquo;</a>
+  {% endif %}
+</div>
 
-        
+<!-- Temperature display — iPad Air Gen 2 safe (no clamp(), vw units only) -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">{{ page_data.DeviceName }}</span>
+    <span class="card-meta" id="current-time">{{ page_data.CurrentTime }}</span>
+  </div>
+  <div class="card-content">
+    <table style="width:100%; border-collapse:collapse;" id="probe-table">
+      <tbody>
+        <tr>
+          {% for probe in page_data.TempProbes %}
+          <td style="text-align:center; padding:0.5rem;" data-probe="{{ probe.Name }}">
+            <div class="temp-display__name">{{ probe.Name }}</div>
+            {% if probe.HaveTemperature %}
+            <div class="temp-display__time">({{ probe.LastReadingTime }})</div>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        <tr>
+          {% for probe in page_data.TempProbes %}
+          <td style="text-align:center; padding:0.25rem;" data-probe-value="{{ probe.Name }}">
+            {% if probe.HaveTemperature %}
+            <span class="temp-display__value">{{ probe.TemperatureInteger }}</span><span class="temp-display__decimal">.{{ probe.TemperatureDecimal }}</span><span class="temp-display__unit">&deg;C</span>
+            {% else %}
+            <span class="temp-display__not-available">N/A</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if page_data.SmartDevices %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Smart Devices</span>
+  </div>
+  <div class="card-content">
+    <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:center;">
+      {% for device in page_data.SmartDevices %}
+      <div class="smart-device-row">
+        <span class="status-indicator {% if device.IsOn %}status-indicator--active{% else %}status-indicator--inactive{% endif %}"></span>
+        {{ device.Name }}
+      </div>
+      {% endfor %}
     </div>
-    <!-- Navigation Buttons -->
-    <div class="responsive--desktop">
-        <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-            class="btn">
-            Home
-        </a>
-        {% if page_data['NextIndex'] is not none %}
-            <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
-            class="btn">
-            Go to {{ page_data['NextDeviceName'] }} >>>
-            </a>
-        {% endif %}
-        <span style="margin-left: 20px; font-size: 1.7rem">{{ page_data['CurrentTime'] }}</span>
-    </div>    
-    <div class="footer-text">
-        Last updated {{ page_data['LastCheck'] }}
-    </div>
-    <script 
-        type="text/javascript" 
-        src="{{ url_for('static', filename='index.js') }}"
-    ></script>
-</body>
-</html>
+  </div>
+</div>
+{% endif %}
+
+{% if page_data.ChartsEnabled %}
+{% for chart in page_data.ChartsData %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">{{ chart.name }}</span>
+  </div>
+  <div class="card-content temp-display__chart-container">
+    <canvas id="chart-{{ loop.index0 }}"></canvas>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block footer_extra %} &mdash; {{ page_data.TempProbes | length }} probe{% if page_data.TempProbes | length != 1 %}s{% endif %}{% endblock %}
+
+{% block scripts %}
+{% if page_data.ChartsEnabled %}
+<script>
+  var chartsData = {{ page_data.ChartsData | tojson }};
+  var COLOURS = ['#2979ff','#ff6d00','#00c853','#d50000','#aa00ff','#00b8d4','#ffd600','#64dd17'];
+
+  chartsData.forEach(function (chart, idx) {
+    var ctx = document.getElementById('chart-' + idx);
+    if (!ctx) return;
+    var datasets = chart.datasets.map(function (ds, di) {
+      var colour = ds.colour || COLOURS[di % COLOURS.length];
+      return {
+        label: ds.display_name,
+        data: ds.timestamps.map(function (t, i) { return { x: t, y: ds.temperatures[i] }; }),
+        borderColor: colour,
+        backgroundColor: colour + '22',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        fill: false,
+        tension: 0.2,
+      };
+    });
+    new Chart(ctx, {
+      type: 'line',
+      data: { datasets: datasets },
+      options: {
+        responsive: true,
+        scales: {
+          x: { type: 'time', time: { tooltipFormat: 'dd MMM HH:mm' }, ticks: { maxTicksLimit: 8 } },
+          y: { title: { display: true, text: '°C' } },
+        },
+        plugins: { legend: { position: 'top' } },
+        animation: false,
+      },
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}
+
+{% block ws_handler %}
+    if (msg.type === 'state_update' && msg.state_file_type === 'TempProbes') {
+      var s = msg.summary;
+      if (!s || !s.TempProbes) return;
+      var lc = document.getElementById('last-check');
+      if (lc) lc.textContent = s.LastCheck;
+      s.TempProbes.forEach(function (probe) {
+        var valCell = document.querySelector('[data-probe-value="' + probe.Name + '"]');
+        if (!valCell) return;
+        if (probe.HaveTemperature) {
+          valCell.innerHTML = '<span class="temp-display__value">' + probe.TemperatureInteger + '</span>'
+            + '<span class="temp-display__decimal">.' + probe.TemperatureDecimal + '</span>'
+            + '<span class="temp-display__unit">&deg;C</span>';
+        } else {
+          valCell.innerHTML = '<span class="temp-display__not-available">N/A</span>';
+        }
+        var nameCell = document.querySelector('[data-probe="' + probe.Name + '"]');
+        if (nameCell && probe.HaveTemperature) {
+          var timeEl = nameCell.querySelector('.temp-display__time');
+          if (timeEl) timeEl.textContent = '(' + probe.LastReadingTime + ')';
+        }
+      });
+      var ct = document.getElementById('current-time');
+      if (ct) {
+        var now = new Date();
+        ct.textContent = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
+      }
+    }
+{% endblock %}

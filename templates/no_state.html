@@ -1,24 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="2">
-    <title>No state data available</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PowerControllerViewer</title>
+  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-    <div>
-        <h1>No State Data Available</h1>
-        <p>There are no PowerController state files available to view.</p>
-        <p>You must first configure the WebsiteBaseURL parameter in the PowerController's configuration file and successfully run the PowerController at least once.</p>
-    </div>
+<header>
+  <a class="header-home" href="{{ home_url }}">PowerController Viewer</a>
+  <span id="clock"></span>
+</header>
 
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">No Device Data</span>
+  </div>
+  <div class="card-content">
+    <p>No device state files have been received yet. Waiting for devices to submit data.</p>
+  </div>
+</div>
 
-    <script 
-        type="text/javascript" 
-        src="{{ url_for('static', filename='index.js') }}"
-    ></script>
+<script>
+  function updateClock() {
+    var now = new Date();
+    var h = String(now.getHours()).padStart(2,'0');
+    var m = String(now.getMinutes()).padStart(2,'0');
+    var s = String(now.getSeconds()).padStart(2,'0');
+    var el = document.getElementById('clock');
+    if (el) el.textContent = h+':'+m+':'+s;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+</script>
 </body>
 </html>

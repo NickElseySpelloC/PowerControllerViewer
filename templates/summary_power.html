@@ -1,135 +1,140 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% if page_data['RefreshDelay'] > 0 %}
-        <meta http-equiv="refresh" content="{{page_data['RefreshDelay']}}">
-    {% endif %}
-    <title>Status summary for {{page_data['DeviceName']}}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body>
+{% extends "_base.html" %}
+
+{% block title %}{{ page_data.DeviceName }} — Summary{% endblock %}
+
+{% block body %}
+<div class="nav-bar">
+  <a href="{{ page_data.home_url }}" class="btn">Home</a>
+  {% if page_data.next_url %}
+  <a href="{{ page_data.next_url }}" class="btn">{{ page_data.NextDeviceName }} &rsaquo;</a>
+  {% endif %}
+  <a href="{{ page_data.daily_url }}" class="btn">Daily Detail</a>
+</div>
+
+<div class="card">
+  <div class="card-header">
     <div>
-        <h1>Status summary for {{page_data['DeviceName']}}</h1>
-        <p>Status as at {{ page_data['TimeNow'] }}: {{ page_data['StatusMessage'] }}</p>
-
-        <!-- Navigation Buttons -->
-        <div class="responsive--desktop">
-            <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-               class="btn">
-               Home
-            </a>
-            {% if page_data['NextIndex'] is not none %}
-                <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
-                class="btn">
-                Go to {{ page_data['NextDeviceName'] }} >>>
-                </a>
-            {% endif %}
-            <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=0, key=page_data['AccessKey']) }}" 
-               class="btn">
-               View {{page_data['DeviceName']}} Daily Data
-            </a>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Description</th>
-                    <th>Value</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Device</td><td>{{ page_data['DeviceName'] }}</td>
-                </tr>
-                <tr>
-                    <td>Last Check</td><td>{{ page_data['LastCheck'] }}</td>
-                </tr>
-                <tr>
-                    <td>Pump Status</td>
-                    <td>
-                        {% if page_data['IsDeviceRunning'] %} 
-                            <span class="status-indicator status-indicator--active"></span>
-                        {% else %}
-                            <span class="status-indicator status-indicator--inactive"></span>
-                        {% endif %}   
-                        {{ page_data['PumpStatus'] }}
-                    </td>
-                </tr>
-                <tr>
-                    <td>Runtime Today</td>
-                    <td>
-                        {% if page_data['ShowPlannedRuntime']  %}
-                            Target: {{ page_data['TargetRuntime'] }} hrs<br>
-                            Prior Shortfall: {{ page_data['PriorShortfall'] }} hrs<br>
-                            Planned: {{ page_data['PlannedRuntime'] }} hrs<br>
-                            Actual: {{ page_data['ActualRuntime'] }} hrs<br>
-                            Remaining: {{ page_data['RemainingRuntime'] }} hrs
-                        {% else %}
-                            {{ page_data['ActualRuntime'] }} hrs<br>
-                        {% endif %}
-                    </td>
-                </tr>
-                <tr>
-                    <td>Average Daily Runtime</td><td>{{ page_data['AverageDailyRuntime'] }} hours</td>
-                </tr>
-                <tr>
-                    <td>Current Price</td><td>{{ page_data['CurrentPrice'] }} c/kWh
-                        {% if not page_data['LivePrices'] %}
-                        &nbsp;(No live prices available)
-                        {% endif %}
-                    </td>
-                </tr>
-                <tr>
-                    <td>Average Energy Price</td><td>{{ page_data['AverageEnergyPrice'] }} c/kWh</td>
-                </tr>
-                <tr>
-                    <td>Average Daily Usage</td><td>{{ page_data['AverageDailyUsage'] }} kWh&nbsp;&nbsp;{{ page_data['AverageDailyCost'] }}</td>
-                </tr>
-                {% if page_data['HaveRunPlan'] %}
-                <tr>
-                    <td>Remaining Run Plan</td>
-                    <td>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>From</th>
-                                    <th>To</th>
-                                    <th>Duration</th>
-                                    <th>Price</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                    {% for plan in page_data['RunPlan'] %}
-                                    <tr>
-                                        <td>{{ plan['From'] }}</td>
-                                        <td>{{ plan['To'] }}</td>
-                                        <td>{{ plan['Duration'] }}</td>
-                                        <td>{{ plan['AveragePrice'] }} c/kWh</td>
-                                    </tr>
-                                    {% endfor %}
-                            </tbody>
-                        </table>
-                    </td>
-                </tr>
-                {% endif %}
-                <tr>
-                    <td>Forecast Average Price</td><td>{{ page_data['ForecastPrice'] }} c/kWh</td>
-                </tr>
-                {% if page_data['DebugMessage'] is not none %}
-                    <tr>
-                        <td>Debug Information</td><td>{{ page_data['DebugMessage'] | safe }} </td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
-        
+      <div class="card-title">{{ page_data.DeviceName }}</div>
+      <div class="card-meta" data-field="status-message">{{ page_data.StatusMessage }}</div>
     </div>
-    <script 
-        type="text/javascript" 
-        src="{{ url_for('static', filename='index.js') }}"
-    ></script>
-</body>
-</html>
+    <div>
+      <span class="status-badge {% if page_data.IsDeviceRunning %}on{% else %}off{% endif %}" data-field="badge">
+        {% if page_data.IsDeviceRunning %}ON{% else %}OFF{% endif %}
+      </span>
+    </div>
+  </div>
+  <div class="card-content">
+    <table class="info-table">
+      <tbody>
+        <tr>
+          <td class="label">Status</td>
+          <td class="value">
+            <span class="status-indicator {% if page_data.IsDeviceRunning %}status-indicator--active{% else %}status-indicator--inactive{% endif %}" data-field="indicator"></span>
+            <span data-field="pump-status">{{ page_data.PumpStatus }}</span>
+          </td>
+        </tr>
+        <tr>
+          <td class="label">Last Check</td>
+          <td class="value" data-field="last-check">{{ page_data.LastCheck }}</td>
+        </tr>
+        <tr>
+          <td class="label">Runtime Today</td>
+          <td class="value">
+            {% if page_data.ShowPlannedRuntime %}
+            Target: {{ page_data.TargetRuntime }} hrs<br>
+            Prior Shortfall: {{ page_data.PriorShortfall }} hrs<br>
+            Planned: {{ page_data.PlannedRuntime }} hrs<br>
+            Actual: <span data-field="actual-runtime">{{ page_data.ActualRuntime }}</span> hrs<br>
+            Remaining: <span data-field="remaining-runtime">{{ page_data.RemainingRuntime }}</span> hrs
+            {% else %}
+            <span data-field="actual-runtime">{{ page_data.ActualRuntime }}</span> hrs
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td class="label">Average Daily Runtime</td>
+          <td class="value">{{ page_data.AverageDailyRuntime }} hrs</td>
+        </tr>
+        <tr>
+          <td class="label">Current Price</td>
+          <td class="value">
+            <span data-field="current-price">{{ page_data.CurrentPrice }}</span> c/kWh
+            {% if not page_data.LivePrices %}<span class="card-meta">&nbsp;(no live prices)</span>{% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td class="label">Average Energy Price</td>
+          <td class="value">{{ page_data.AverageEnergyPrice }} c/kWh</td>
+        </tr>
+        <tr>
+          <td class="label">Average Daily Usage</td>
+          <td class="value">{{ page_data.AverageDailyUsage }} kWh &mdash; {{ page_data.AverageDailyCost }}</td>
+        </tr>
+        {% if page_data.HaveRunPlan %}
+        <tr>
+          <td class="label">Remaining Run Plan</td>
+          <td class="value">
+            <table class="inner-table">
+              <thead>
+                <tr>
+                  <th>From</th><th>To</th><th>Duration</th><th>Price</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for plan in page_data.RunPlan %}
+                <tr>
+                  <td>{{ plan.From }}</td>
+                  <td>{{ plan.To }}</td>
+                  <td>{{ plan.Duration }}</td>
+                  <td>{{ plan.AveragePrice }} c/kWh</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td class="label">Forecast Avg Price</td>
+          <td class="value">{{ page_data.ForecastPrice }} c/kWh</td>
+        </tr>
+        {% if page_data.DebugMessage %}
+        <tr>
+          <td class="label">Debug</td>
+          <td class="value">{{ page_data.DebugMessage }}</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block ws_handler %}
+    if (msg.type === 'state_update' && msg.state_file_type === 'PowerController') {
+      var s = msg.summary;
+      if (!s) return;
+      function patch(field, val) {
+        var el = document.querySelector('[data-field="' + field + '"]');
+        if (el && val !== undefined) el.textContent = val;
+      }
+      var isOn = s.IsDeviceRunning;
+      patch('pump-status', s.PumpStatus);
+      patch('status-message', s.StatusMessage);
+      patch('last-check', s.LastCheck);
+      patch('actual-runtime', s.ActualRuntime);
+      patch('remaining-runtime', s.RemainingRuntime);
+      patch('current-price', s.CurrentPrice);
+      var badge = document.querySelector('[data-field="badge"]');
+      if (badge) { badge.textContent = isOn ? 'ON' : 'OFF'; badge.className = 'status-badge ' + (isOn ? 'on' : 'off'); }
+      var ind = document.querySelector('[data-field="indicator"]');
+      if (ind) ind.className = 'status-indicator ' + (isOn ? 'status-indicator--active' : 'status-indicator--inactive');
+      var lc = document.getElementById('last-check');
+      if (lc) lc.textContent = s.LastCheck;
+    }
+    if (msg.type === 'state_update' && msg.home_device) {
+      var d = msg.home_device;
+      var lc = document.getElementById('last-check');
+      if (lc) lc.textContent = d.last_check;
+    }
+{% endblock %}

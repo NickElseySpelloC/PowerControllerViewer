@@ -1,249 +1,142 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% if page_data['RefreshDelay'] > 0 %}
-        <meta http-equiv="refresh" content="{{page_data['RefreshDelay']}}">
-    {% endif %}
-    <title>{{page_data['DeviceName']}}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body>
+{% extends "_base.html" %}
+
+{% block title %}{{ page_data.DeviceName }} — Metering{% endblock %}
+
+{% block body %}
+<div class="nav-bar">
+  <a href="{{ page_data.home_url }}" class="btn">Home</a>
+  {% if page_data.next_url %}
+  <a href="{{ page_data.next_url }}" class="btn">{{ page_data.NextDeviceName }} &rsaquo;</a>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-header">
     <div>
-        <h1>{{page_data['DeviceName']}}</h1>
-
-        <!-- Navigation Buttons -->
-        <div class="responsive--desktop">
-            <div style="display: flex; align-items: center; margin-bottom: 20px;">
-                <div>
-                    <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-                    class="btn">
-                    Home
-                    </a>
-                    {% if page_data['NextIndex'] is not none %}
-                        <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
-                        class="btn">
-                        Go to {{ page_data['NextDeviceName'] }} >>>
-                        </a>
-                    {% endif %}
-                </div>
-
-                &nbsp;&nbsp;
-
-                <!-- Period Selection Form -->
-                <div>
-                    <form id="periodForm" method="get" action="{{ url_for('views.summary') }}" style="margin: 0;"
-                        data-custom-start="{{ page_data['CustomStartDate'] or '' }}"
-                        data-custom-end="{{ page_data['CustomEndDate'] or '' }}"
-                        data-min-date="{{ page_data['FirstDate'] }}"
-                        data-max-date="{{ page_data['LastDate'] }}">
-                        <input type="hidden" name="state_idx" value="{{ page_data['CurrentIndex'] }}">
-                        {% if page_data['AccessKey'] %}
-                            <input type="hidden" name="key" value="{{ page_data['AccessKey'] }}">
-                        {% endif %}
-                        
-                        <label for="periodSelect">Add Period:</label>
-                        <select id="periodSelect" name="period_idx">
-                            {% for choice in page_data['PeriodChoiceList'] %}
-                                <option value="{{ choice['ID'] }}" 
-                                        data-custom="{{ choice['Custom']|lower }}"
-                                        {% if choice['Selected'] %}selected{% endif %}>
-                                    {{ choice['Name'] }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                        
-                        &nbsp;&nbsp;
-                        
-                        <label for="startDate">Start Date:</label>
-                        <input type="date" id="startDate" name="start_date" 
-                            disabled
-                            {% if page_data['CustomStartDate'] %}value="{{ page_data['CustomStartDate'] }}"{% endif %}
-                            min="{{ page_data['FirstDate'] }}" 
-                            max="{{ page_data['LastDate'] }}">
-                        
-                        &nbsp;&nbsp;
-                        
-                        <label for="endDate">End Date:</label>
-                        <input type="date" id="endDate" name="end_date" 
-                            disabled
-                            {% if page_data['CustomEndDate'] %}value="{{ page_data['CustomEndDate'] }}"{% endif %}
-                            min="{{ page_data['FirstDate'] }}" 
-                            max="{{ page_data['LastDate'] }}">
-                        
-                        &nbsp;&nbsp;
-                        
-                        <button type="submit" class="btn">Submit</button>
-                    </form>
-                </div>
-
-            </div>
-        </div>
-
-        <table>
-            <thead>
-                <tr>    <!-- Add a row with the periods -->
-                    <th rowspan="2">Metered Output</th>
-                    {% for period in page_data['Totals'] %}
-                        <th colspan="2">{{ period['PeriodAndDate'] }}</th>
-                    {% endfor %}
-                </tr>
-                <tr>    <!-- Add a row with the sub-headings -->
-                    {% for period in page_data['Totals'] %}
-                        <th>Energy</th>
-                        <th>Cost</th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
-                <!-- List the energy usage for each metered output -->
-                {% for meter in page_data['Meters'] %}
-                    <tr>
-                        <td>{{ meter['Name'] }}</td>
-                        {% for period in meter['Usage'] %}
-                            <td>{{ period['EnergyUsedStr'] }}</td>
-                            <td>{{ period['CostStr'] }}</td>
-                        {% endfor %}
-                    </tr>
-                {% endfor %}
-                <!-- Row for Other usage  -->
-                <tr>
-                    <td>Unmetered Usage</td>
-                    {% for period in page_data['Totals'] %}
-                        <td>{{ period['OtherEnergyUsedStr'] }}</td>
-                        <td>{{ period['OtherCostStr'] }}</td>
-                    {% endfor %}
-                </tr>
-
-                <!-- Add total row -->
-                <tr>
-                    <th>Totals</th>
-                    {% for period in page_data['Totals'] %}
-                        <th>{{ period['GlobalEnergyUsedStr'] }}</th>
-                        <th>{{ period['GlobalCostStr'] }}</th>
-                    {% endfor %}
-                </tr>
-            </tbody>
-        </table>
-        
+      <div class="card-title">{{ page_data.DeviceName }}</div>
+      <div class="card-meta">Last check: <span data-field="last-check">{{ page_data.LastCheck }}</span></div>
     </div>
-    <script 
-        type="text/javascript" 
-        src="{{ url_for('static', filename='index.js') }}"
-    ></script>
-    <script>
-        // Period selection form logic
-        const form = document.getElementById('periodForm');
-        const periodSelect = document.getElementById('periodSelect');
-        const startDateInput = document.getElementById('startDate');
-        const endDateInput = document.getElementById('endDate');
-        
-        // Read template variables from data attributes
-        const customStartDate = form.dataset.customStart || null;
-        const customEndDate = form.dataset.customEnd || null;
-        const minDateStr = form.dataset.minDate;
-        const maxDateStr = form.dataset.maxDate;
+    <form class="period-form" id="periodForm"
+          data-state-idx="{{ page_data.CurrentIndex }}"
+          data-access-key="{{ page_data.AccessKey or '' }}"
+          data-min-date="{{ page_data.FirstDate or '' }}"
+          data-max-date="{{ page_data.LastDate or '' }}"
+          data-custom-start="{{ page_data.CustomStartDate or '' }}"
+          data-custom-end="{{ page_data.CustomEndDate or '' }}">
+      <label for="periodSelect">Period:</label>
+      <select id="periodSelect">
+        {% for choice in page_data.PeriodChoiceList %}
+        <option value="{{ choice.ID }}"
+                data-custom="{{ 'true' if choice.Custom else 'false' }}"
+                {% if choice.Selected %}selected{% endif %}>
+          {{ choice.Name }}{% if choice.Custom and choice.Description != 'Custom period' %} ({{ choice.Description }}){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <input type="date" id="startDate"
+             {% if not page_data.CustomStartDate %}disabled{% endif %}
+             value="{{ page_data.CustomStartDate or '' }}"
+             min="{{ page_data.FirstDate or '' }}"
+             max="{{ page_data.LastDate or '' }}">
+      <span style="color:#555">to</span>
+      <input type="date" id="endDate"
+             {% if not page_data.CustomEndDate %}disabled{% endif %}
+             value="{{ page_data.CustomEndDate or '' }}"
+             min="{{ page_data.FirstDate or '' }}"
+             max="{{ page_data.LastDate or '' }}">
+      <button type="button" class="btn" id="periodSubmit">Apply</button>
+    </form>
+  </div>
 
-        // Function to toggle date fields based on selection
-        function updateDateFields() {
-            const selectedOption = periodSelect.options[periodSelect.selectedIndex];
-            const isCustom = selectedOption.getAttribute('data-custom') === 'true';
-            
-            startDateInput.disabled = !isCustom;
-            endDateInput.disabled = !isCustom;
-            
-            // If switching to non-custom, clear the date inputs
-            if (!isCustom) {
-                startDateInput.value = '';
-                endDateInput.value = '';
-            } else {
-                // If switching to custom, populate with defaults if available
-                if (customStartDate) {
-                    startDateInput.value = customStartDate;
-                }
-                if (customEndDate) {
-                    endDateInput.value = customEndDate;
-                }
-            }
-        }
+  <div class="card-content">
+    {% if page_data.Totals %}
+    <table class="metering-table">
+      <thead>
+        <tr>
+          <th rowspan="2">Metered Output</th>
+          {% for period in page_data.Totals %}
+          <th colspan="2">{{ period.PeriodAndDate }}</th>
+          {% endfor %}
+        </tr>
+        <tr>
+          {% for period in page_data.Totals %}
+          <th>Energy</th>
+          <th>Cost</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for meter in page_data.Meters %}
+        <tr>
+          <td>{{ meter.Name }}</td>
+          {% for usage in meter.Usage %}
+          <td>{{ usage.EnergyUsedStr }}</td>
+          <td>{{ usage.CostStr }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+        <tr>
+          <td>Unmetered</td>
+          {% for period in page_data.Totals %}
+          <td>{{ period.OtherEnergyUsedStr }}</td>
+          <td>{{ period.OtherCostStr }}</td>
+          {% endfor %}
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <th>Totals</th>
+          {% for period in page_data.Totals %}
+          <th>{{ period.GlobalEnergyUsedStr }}</th>
+          <th>{{ period.GlobalCostStr }}</th>
+          {% endfor %}
+        </tr>
+      </tfoot>
+    </table>
+    {% else %}
+    <p class="card-meta">No data available for the selected period.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
 
-        // Function to validate dates
-        function validateDates() {
-            const startDate = new Date(startDateInput.value);
-            const endDate = new Date(endDateInput.value);
-            const minDate = new Date(minDateStr);
-            const maxDate = new Date(maxDateStr);
+{% block scripts %}
+<script>
+  (function () {
+    var form = document.getElementById('periodForm');
+    var periodSelect = document.getElementById('periodSelect');
+    var startDate = document.getElementById('startDate');
+    var endDate = document.getElementById('endDate');
 
-            if (startDateInput.value && endDateInput.value) {
-                if (startDate > endDate) {
-                    alert('Start Date must be less than or equal to End Date');
-                    return false;
-                }
-            }
+    function isCustomSelected() {
+      var opt = periodSelect.options[periodSelect.selectedIndex];
+      return opt && opt.getAttribute('data-custom') === 'true';
+    }
 
-            if (startDateInput.value) {
-                if (startDate < minDate || startDate > maxDate) {
-                    alert('Start Date must be between ' + minDateStr + ' and ' + maxDateStr);
-                    return false;
-                }
-            }
+    function updateDateFields() {
+      var custom = isCustomSelected();
+      startDate.disabled = !custom;
+      endDate.disabled = !custom;
+      if (!custom) { startDate.value = ''; endDate.value = ''; }
+    }
 
-            if (endDateInput.value) {
-                if (endDate < minDate || endDate > maxDate) {
-                    alert('End Date must be between ' + minDateStr + ' and ' + maxDateStr);
-                    return false;
-                }
-            }
+    periodSelect.addEventListener('change', updateDateFields);
 
-            return true;
-        }
+    document.getElementById('periodSubmit').addEventListener('click', function () {
+      var stateIdx = form.dataset.stateIdx;
+      var key = form.dataset.accessKey;
+      var url = '/summary?state_idx=' + stateIdx;
+      if (key) url += '&key=' + encodeURIComponent(key);
 
-        // Handle form submission
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const selectedOption = periodSelect.options[periodSelect.selectedIndex];
-            const isCustom = selectedOption.getAttribute('data-custom') === 'true';
-            const stateIdx = document.querySelector('input[name="state_idx"]').value;
-            const accessKey = document.querySelector('input[name="key"]')?.value;
-            
-            let url = '/summary?state_idx=' + stateIdx;
-            
-            if (accessKey) {
-                url += '&key=' + accessKey;
-            }
-            
-            if (isCustom) {
-                // Validate dates for custom period
-                if (!startDateInput.value || !endDateInput.value) {
-                    alert('Please select both Start Date and End Date for custom period');
-                    return;
-                }
-                
-                if (!validateDates()) {
-                    return;
-                }
-                
-                url += '&start_date=' + startDateInput.value + '&end_date=' + endDateInput.value;
-            } else {
-                // Use period_idx for non-custom periods
-                url += '&period_idx=' + selectedOption.value;
-            }
-            
-            window.location.href = url;
-        });
-
-        // Listen for changes to the select dropdown
-        periodSelect.addEventListener('change', updateDateFields);
-
-        // Listen for date changes to validate
-        startDateInput.addEventListener('change', validateDates);
-        endDateInput.addEventListener('change', validateDates);
-
-        // Initialize the form state on page load
-        updateDateFields();
-    </script>
-</body>
-</html>
+      if (isCustomSelected()) {
+        if (!startDate.value || !endDate.value) { alert('Please select both start and end dates.'); return; }
+        if (startDate.value > endDate.value) { alert('Start date must be on or before end date.'); return; }
+        url += '&start_date=' + startDate.value + '&end_date=' + endDate.value;
+      } else {
+        url += '&period_idx=' + periodSelect.value;
+      }
+      window.location.href = url;
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,260 +1,457 @@
-/* ===========================
-   BASE STYLES
-   =========================== */
+/* PowerControllerViewer styles — consistent with LightingControl design language */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 
 body {
-    font-family: 'Arial', sans-serif;
-    margin: 20px;
-    background-color: #f9f9f9;
-    color: #333;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a2e;
+  margin: 0;
+  padding: 0 0 2rem;
 }
 
-h1, h2 {
-    color: #444;
+/* ── Header ────────────────────────────────────────────────────────────────── */
+
+header {
+  background: #16213e;
+  color: #e0e0e0;
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-a {
-    text-decoration: none;
+header h1 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
-/* ===========================
-   TABLE STYLES
-   =========================== */
-
-table {
-    border-collapse: collapse;
-    margin-top: 20px;
-    background-color: #fff;
+.header-home {
+  color: #e0e0e0;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
-th,
-td {
-    border: 1px solid #ddd;
-    padding: 10px;
-    text-align: left;
-    vertical-align: top;
+.header-home:hover {
+  color: #b6c6de;
 }
 
-th {
-    background-color: #f2f2f2;
-    font-weight: bold;
+#clock {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+  color: #b6c6de;
+  letter-spacing: 0.05em;
 }
 
-tr:hover {
-    background-color: #f1f1f1;
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+
+#page-footer {
+  margin: 1.5rem 1rem 0.5rem;
+  font-size: 0.8rem;
+  color: #aaa;
 }
 
-/* Nested table styles */
-table table {
-    width: 100%;
-    margin: 5px;
+/* ── Navigation bar (below header on summary pages) ────────────────────────── */
+
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1rem 0.75rem;
+  flex-wrap: wrap;
 }
 
-table table th,
-table table td {
-    border: 1px solid #ccc;
-    padding: 5px;
+/* ── Cards ─────────────────────────────────────────────────────────────────── */
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.10);
+  margin: 0.75rem 1rem;
+  overflow: hidden;
 }
 
-/* Borderless table */
-.table--borderless {
-    border: none;
-    margin: 0;
-    padding: 0;
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: #f8f9fb;
+  border-bottom: 1px solid #e8eaed;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
-.table--borderless td,
-.table--borderless th {
-    border: none;
+.card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #16213e;
 }
 
-/* Table cell alignment utilities */
-.table__cell--center {
-    vertical-align: middle;
-    text-align: center;
+.card-meta {
+  font-size: 0.8rem;
+  color: #555;
+  margin-top: 0.2rem;
 }
 
-.table__cell--left {
-    vertical-align: middle;
-    text-align: left;
+.card-content {
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
 }
 
-.table__cell--right {
-    vertical-align: middle;
-    text-align: right;
-}
-
-/* ===========================
-   BUTTON STYLES
-   =========================== */
+/* ── Buttons ────────────────────────────────────────────────────────────────── */
 
 .btn {
-    display: inline-block;
-    padding: 5px 10px;
-    margin: 5px;
-    font-size: 14px;
-    text-decoration: none;
-    color: white;
-    background-color: #007BFF;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    text-align: center;
+  display: inline-block;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid #c8cdd5;
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+  font-size: 0.82rem;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
 }
 
 .btn:hover {
-    background-color: #0056b3;
+  background: #e8eaf0;
+  border-color: #aab;
 }
 
 .btn--disabled,
 .btn.disabled {
-    background-color: #cccccc;
-    color: #666666;
-    cursor: not-allowed;
-    pointer-events: none;
+  background: #f0f0f0;
+  color: #bbb;
+  border-color: #ddd;
+  cursor: default;
+  pointer-events: none;
 }
 
-/* ===========================
-   STATUS INDICATOR
-   =========================== */
+/* ── Status indicators ──────────────────────────────────────────────────────── */
 
 .status-indicator {
-    display: inline-block;
-    width: 1.2em;
-    height: 1.2em;
-    border-radius: 50%;
-    vertical-align: middle;
-    margin: 0 4px;
+  display: inline-block;
+  width: 1.1em;
+  height: 1.1em;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin: 0 3px;
 }
 
-.status-indicator--active {
-    background-color: #00c853;
+.status-indicator--active   { background: #00c853; }
+.status-indicator--inactive { background: #000; }
+
+.status-badge {
+  display: inline-block;
+  padding: 0.1em 0.5em;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
-.status-indicator--inactive {
-    background-color: #000000;
+.status-badge.on  { background: #e6f9ee; color: #007a33; }
+.status-badge.off { background: #fde8e8; color: #c0392b; }
+
+/* ── Data tables (description/value style) ──────────────────────────────────── */
+
+.info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
 }
 
-/* ===========================
-   FOOTER
-   =========================== */
-
-.footer-text {
-    font-size: 0.8em;
-    color: rgba(29, 28, 28, 0.56);
-    margin-top: 20px;
+.info-table td {
+  padding: 0.4rem 0.75rem;
+  vertical-align: top;
+  border-bottom: 1px solid #f0f2f5;
 }
 
-/* ===========================
-   TEMPERATURE DISPLAY
-   =========================== */
+.info-table tr:last-child td {
+  border-bottom: none;
+}
+
+.info-table .label {
+  color: #666;
+  font-weight: 500;
+  width: 40%;
+  white-space: nowrap;
+}
+
+.info-table .value {
+  color: #1a1a2e;
+}
+
+/* ── Device list table (home page) ─────────────────────────────────────────── */
+
+.device-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.device-table th {
+  text-align: left;
+  padding: 0.45rem 0.75rem;
+  color: #777;
+  font-weight: 500;
+  font-size: 0.78rem;
+  border-bottom: 1px solid #e8eaed;
+  background: #fafbfc;
+}
+
+.device-table td {
+  padding: 0.55rem 0.75rem;
+  vertical-align: middle;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.device-table tr:last-child td {
+  border-bottom: none;
+}
+
+.device-table a {
+  color: #16213e;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.device-table a:hover {
+  text-decoration: underline;
+}
+
+/* ── Nested run-plan tables ─────────────────────────────────────────────────── */
+
+.inner-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.inner-table th {
+  text-align: left;
+  padding: 0.3rem 0.6rem;
+  color: #777;
+  font-weight: 500;
+  border-bottom: 1px solid #e8eaed;
+}
+
+.inner-table td {
+  padding: 0.3rem 0.6rem;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.inner-table tr:last-child td { border-bottom: none; }
+
+/* ── Switch states table (LightingControl) ──────────────────────────────────── */
+
+.switch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.switch-table th {
+  text-align: left;
+  padding: 0.35rem 0.6rem;
+  color: #777;
+  font-weight: 500;
+  font-size: 0.78rem;
+  border-bottom: 1px solid #e8eaed;
+}
+
+.switch-table td {
+  padding: 0.4rem 0.6rem;
+  vertical-align: middle;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.switch-table tr:last-child td { border-bottom: none; }
+
+/* ── Schedule cards (LightingControl) ───────────────────────────────────────── */
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.schedule-table th, .schedule-table td {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #e8eaed;
+  vertical-align: top;
+}
+
+.schedule-table th {
+  background: #fafbfc;
+  font-weight: 600;
+  color: #16213e;
+}
+
+.day-pip {
+  display: inline-block;
+  width: 1.5em;
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.day-pip--on  { color: #007a33; font-weight: 700; }
+.day-pip--off { color: #ccc; }
+
+/* ── Energy metering table ──────────────────────────────────────────────────── */
+
+.metering-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.metering-table th, .metering-table td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid #e8eaed;
+  text-align: right;
+}
+
+.metering-table th:first-child,
+.metering-table td:first-child {
+  text-align: left;
+}
+
+.metering-table thead th {
+  background: #fafbfc;
+  color: #555;
+  font-weight: 600;
+  font-size: 0.78rem;
+}
+
+.metering-table tfoot th {
+  background: #f0f2f5;
+  font-weight: 700;
+  border-top: 2px solid #e8eaed;
+}
+
+.metering-table tr:last-child td { border-bottom: none; }
+
+/* ── Metering period selector ───────────────────────────────────────────────── */
+
+.period-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+}
+
+.period-form label { color: #555; }
+
+.period-form select,
+.period-form input[type="date"] {
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #c8cdd5;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  background: #fff;
+}
+
+/* ── Temperature display (kiosk page — iPad Air Gen 2 safe, no clamp()) ─────── */
 
 .temp-display__name {
-    font-size: 4.0vw; /* Fallback for older browsers */
-    font-size: clamp(1rem, 2.5vw, 6rem);
-    text-align: center;
-    color: blue;
+  font-size: 4.0vw;  /* vw fallback for older browsers */
+  text-align: center;
+  color: #16213e;
+  font-weight: 600;
 }
 
 .temp-display__time {
-    font-size: 2.5vw; /* Fallback for older browsers */
-    font-size: clamp(0.7rem, 0.9vw, 1.2rem);
-    color: rgb(41, 39, 39);
+  font-size: 2.0vw;
+  color: #777;
 }
 
 .temp-display__value {
-    font-size: 12.0vw; /* Fallback for older browsers */
-    font-size: clamp(1.0rem, 7.0vw, 16.0rem);
-    text-align: center;
+  font-size: 12.0vw;
+  text-align: center;
+  font-weight: 300;
+  line-height: 1;
+  color: #16213e;
 }
 
 .temp-display__decimal {
-    font-size: 6.0vw; /* Fallback for older browsers */
-    font-size: clamp(1.0rem, 3.5vw, 10.0rem);
-    text-align: center;
+  font-size: 6.0vw;
+  text-align: center;
 }
 
 .temp-display__unit {
-    vertical-align: top;
-    font-size: 2.0vw; /* Fallback for older browsers */
-    font-size: clamp(1.0rem, 2.0vw, 4.0rem);
+  vertical-align: top;
+  font-size: 2.5vw;
+  color: #555;
 }
 
 .temp-display__not-available {
-    font-size: 3.5vw; /* Fallback for older browsers */
-    font-size: clamp(1.0rem, 3.5vw, 8rem);
+  font-size: 4.0vw;
+  color: #aaa;
 }
 
 .temp-display__chart-container {
-    vertical-align: middle;
-    text-align: center;
-    border: none;
+  padding: 0.5rem 0;
+  text-align: center;
 }
 
-.temp-display__chart {
-    margin-top: 0;
-    width: 90%;
-    height: auto;
-    object-fit: contain;
+/* ── Smart device indicators (temp probes page) ─────────────────────────────── */
+
+.smart-device-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  font-size: 0.85rem;
+  color: #555;
 }
 
-/* ===========================
-   RESPONSIVE UTILITIES
-   =========================== */
+/* ── Responsive ─────────────────────────────────────────────────────────────── */
 
-/* Desktop-only content */
-.responsive--desktop {
-    display: block;
+.desktop-only { display: block; }
+.mobile-only  { display: none; }
+
+@media (max-width: 600px) {
+  .card {
+    margin: 0.5rem;
+    border-radius: 6px;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .nav-bar {
+    padding: 0 0.5rem 0.5rem;
+  }
+
+  .info-table .label { width: 45%; }
 }
 
-/* Mobile-only content */
-.responsive--mobile {
-    display: none;
-}
-
-/* Table responsive variants */
-.table--desktop {
-    display: table;
-}
-
-.table--mobile {
-    display: none;
-}
-
-/* Mobile breakpoint */
 @media (max-width: 480px) {
-    .responsive--desktop {
-        display: none !important;
-    }
+  .desktop-only { display: none !important; }
+  .mobile-only  { display: block !important; }
 
-    .responsive--mobile {
-        display: block !important;
-    }
-
-    .table--desktop {
-        display: none;
-    }
-
-    .table--mobile {
-        display: table;
-    }
+  .device-table th:nth-child(2),
+  .device-table td:nth-child(2),
+  .device-table th:nth-child(3),
+  .device-table td:nth-child(3) {
+    display: none;
+  }
 }
 
-/* Desktop breakpoint */
 @media (min-width: 481px) {
-    .responsive--mobile {
-        display: none !important;
-    }
-
-    .responsive--desktop {
-        display: block !important;
-    }
-
-    .table--mobile {
-        display: none;
-    }
-
-    .table--desktop {
-        display: table;
-    }
+  .mobile-only  { display: none !important; }
+  .desktop-only { display: block !important; }
 }

@@ -1,99 +1,83 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% if page_data['RefreshDelay'] > 0 %}
-        <meta http-equiv="refresh" content="page_data['RefreshDelay']">
-    {% endif %}
-    <title>{{page_data['DeviceName']}} detail page for [date]</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body>
+{% extends "_base.html" %}
+
+{% block title %}{{ page_data.DeviceName }} — {{ page_data.DateLong }}{% endblock %}
+
+{% block body %}
+<div class="nav-bar">
+  <a href="{{ page_data.home_url }}" class="btn">Home</a>
+  <a href="{{ page_data.summary_url }}" class="btn">Summary</a>
+  {% if page_data.prev_day_url %}
+  <a href="{{ page_data.prev_day_url }}" class="btn">&lsaquo; Previous Day</a>
+  {% else %}
+  <span class="btn btn--disabled">&lsaquo; Previous Day</span>
+  {% endif %}
+  {% if page_data.next_day_url %}
+  <a href="{{ page_data.next_day_url }}" class="btn">Next Day &rsaquo;</a>
+  {% else %}
+  <span class="btn btn--disabled">Next Day &rsaquo;</span>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-header">
     <div>
-        <h1>Detail page for {{page_data['DeviceName']}} for {{page_data['DateLong']}}</h1>
-
-        <!-- Navigation Buttons -->
-        <div>
-            <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-               class="btn">
-               Home
-            </a>
-            <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=page_data['PreviousDay'], key=page_data['AccessKey']) }}" 
-               class="btn{% if page_data['PreviousDay'] is none %} btn--disabled{% endif %}">
-                Previous Day
-            </a>
-            <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=page_data['NextDay'], key=page_data['AccessKey']) }}" 
-               class="btn{% if page_data['NextDay'] is none %} btn--disabled{% endif %}">
-                Next Day
-            </a>
-            <a href="{{ url_for('views.summary', state_idx=page_data['CurrentIndex'], key=page_data['AccessKey']) }}" 
-                class="btn">
-                Back to Summary
-            </a>
-        </div>
-
-        <!-- Daily Data Table -->
-        <table>
-            <thead>
-                <tr>
-                    <th>Description</th>
-                    <th>Value</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Date</td><td>{{ page_data['Date'] }}</td>
-                </tr>
-                <tr>
-                    <td>Actual Runtime</td><td>{{ page_data['ActualRuntime'] }}</td>
-                </tr>
-                {% if page_data['ShowPlannedRuntime']  %}
-                    <tr>
-                        <td>Shortfall Carried Over</td><td>{{ page_data['Shortfall'] }} hours</td>
-                    </tr>
-                    <tr>
-                        <td>Target Runtime</td><td>{{ page_data['TargetRuntime'] }} hours</td>
-                    </tr>
-                {% endif %}
-                <tr>
-                    <td>Energy Usage</td><td>{{ page_data['EnergyUsed'] }}</td>                    
-                </tr>
-                {% if page_data['HaveRunPlan'] %}
-                <tr>
-                    <td>{{page_data['DeviceName']}} Runs</td>
-                    <td>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Start</th>
-                                    <th>Stop</th>
-                                    <th>Duration</th>
-                                    <th>Price</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                    {% for run in page_data['DeviceRuns'] %}
-                                    <tr>
-                                        <td>{{ run['Start'] }}</td>
-                                        <td>{{ run['End'] }}</td>
-                                        <td>{{ run['Duration'] }}</td>
-                                        <td>{{ run['Price'] }} </td>
-                                    </tr>
-                                    {% endfor %}
-                            </tbody>
-                        </table>
-                    </td>
-                </tr>
-                {% endif %}            
-            </tbody>
-        </table>
-        
+      <div class="card-title">{{ page_data.DeviceName }}</div>
+      <div class="card-meta">{{ page_data.DateLong }}</div>
     </div>
-    <script 
-        type="text/javascript" 
-        src="{{ url_for('static', filename='index.js') }}"
-    ></script>
-</body>
-</html>
+  </div>
+  <div class="card-content">
+    <table class="info-table">
+      <tbody>
+        <tr>
+          <td class="label">Actual Runtime</td>
+          <td class="value">{{ page_data.ActualRuntime }}</td>
+        </tr>
+        {% if page_data.ShowPlannedRuntime %}
+        <tr>
+          <td class="label">Target Runtime</td>
+          <td class="value">{{ page_data.TargetRuntime }} hrs</td>
+        </tr>
+        <tr>
+          <td class="label">Shortfall Carried Over</td>
+          <td class="value">{{ page_data.Shortfall }} hrs</td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td class="label">Energy Usage</td>
+          <td class="value">{{ page_data.EnergyUsed }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if page_data.HaveRunPlan %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">{{ page_data.DeviceName }} Runs</span>
+  </div>
+  <div class="card-content">
+    <table class="inner-table">
+      <thead>
+        <tr>
+          <th>Start</th>
+          <th>Stop</th>
+          <th>Duration</th>
+          <th>Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in page_data.DeviceRuns %}
+        <tr>
+          <td>{{ run.Start }}</td>
+          <td>{{ run.End }}</td>
+          <td>{{ run.Duration }}</td>
+          <td>{{ run.Price }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

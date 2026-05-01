@@ -1,211 +1,171 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% if page_data['RefreshDelay'] > 0 %}
-        <meta http-equiv="refresh" content="{{page_data['RefreshDelay']}}">
-    {% endif %}
-    <title>Status summary for {{page_data['DeviceName']}}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body>
+{% extends "_base.html" %}
+
+{% block title %}{{ page_data.DeviceName }} — Summary{% endblock %}
+
+{% block body %}
+<div class="nav-bar">
+  <a href="{{ page_data.home_url }}" class="btn">Home</a>
+  {% if page_data.next_url %}
+  <a href="{{ page_data.next_url }}" class="btn">{{ page_data.NextDeviceName }} &rsaquo;</a>
+  {% endif %}
+  {% if page_data.daily_url %}
+  <a href="{{ page_data.daily_url }}" class="btn">Daily Events</a>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-header">
     <div>
-        <h1>Status summary for {{page_data['DeviceName']}}</h1>
-        <p>Status as at {{ page_data['TimeNow'] }}: {{ page_data['LastStatusMessage'] }}</p>
-
-        <!-- Navigation Buttons -->
-        <div class="responsive--desktop">
-            <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-               class="btn">
-               Home
-            </a>
-            {% if page_data['NextIndex'] is not none %}
-                <a href="{{ url_for('views.summary', state_idx=page_data['NextIndex'], key=page_data['AccessKey']) }}" 
-                class="btn">
-                Go to {{ page_data['NextDeviceName'] }} >>>
-                </a>
-            {% endif %}
-            {% if page_data['HaveEvents'] %}
-                <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=0, key=page_data['AccessKey']) }}" 
-                class="btn">
-                View {{page_data['DeviceName']}} Daily Events
-                </a>
-            {% endif %}            
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Description</th>
-                    <th>Value</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td>Device</td><td>{{ page_data['DeviceName'] }}</td>
-                </tr>
-                <tr>
-                    <td>Last Check</td><td>{{ page_data['LastCheck'] }}</td>
-                </tr>
-                <tr>
-                    <td>Dusk Today</td><td>{{ page_data['DuskTime'] }}</td>
-                </tr>
-                <tr>
-                    <td>Dawn Today</td><td>{{ page_data['DawnTime'] }}</td>
-                </tr>
-
-                {% if page_data['HaveSwitchStates'] %}
-                <tr>
-                    <td>Switch States</td>
-                    <td>
-                        <!-- Switch states: Table for desktop display -->
-                        <table class="table--borderless table--desktop">
-                            <thead>
-                                <tr>
-                                    <th>Switch Name</th>
-                                    <th>Schedule</th>
-                                    <th>Input</th>
-                                    <th>Input State</th>
-                                    <th>Light</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                    {% for switch in page_data['SwitchStates'] %}
-                                    <tr>
-                                        <td>{{ switch['Switch'] }}</td>
-                                        <td>{{ switch['Schedule'] }}</td>
-                                        <td>{{ switch['Input'] }}</td>
-                                        <td>  <!-- Input State -->
-                                            {% if switch['InputState'] %} 
-                                                {% if switch['InputState'] == 'ON' %} 
-                                                    <span class="status-indicator status-indicator--active"></span>
-                                                {% else %}
-                                                    <span class="status-indicator status-indicator--inactive"></span>
-                                                {% endif %}   
-                                            {% else %}
-                                                <span>&nbsp;</span>
-                                            {% endif %}   
-                                        </td>
-                                        <td>  <!-- Output State -->
-                                            {% if switch['OutputState'] == 'ON' %} 
-                                                <span class="status-indicator status-indicator--active"></span>
-                                            {% else %}
-                                                <span class="status-indicator status-indicator--inactive"></span>
-                                            {% endif %}   
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                            </tbody>
-                        </table>
-
-                        <!-- Switch states: Table for mobile display -->
-                        <table class="table--borderless table--mobile">
-                            <thead>
-                                <tr>
-                                    <th>Switch Name</th>
-                                    <th>Light</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                    {% for switch in page_data['SwitchStates'] %}
-                                    <tr>
-                                        <td>{{ switch['Switch'] }}</td>
-                                        <td>  <!-- Output State -->
-                                            {% if switch['OutputState'] == 'ON' %} 
-                                                <span class="status-indicator status-indicator--active"></span>
-                                            {% else %}
-                                                <span class="status-indicator status-indicator--inactive"></span>
-                                            {% endif %}   
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                            </tbody>
-                        </table>
-
-
-                    </td>
-                </tr>
-                {% endif %}
-            </tbody>
-        </table>
-        {% for schedule in page_data['Schedules'] %}
-            <div>
-                <h2>Schedule: {{ schedule['Name'] }}</h2>
-                <table>
-                    <!-- Each event in the schedule is represented by a columnin the table. Start with the event number. -->
-                    <thead>
-                        <tr>
-                            <th>Setting</th>
-                            {% for event in schedule['Events'] %}
-                                <th>Event {{ loop.index }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- On time -->
-                        <tr>
-                            <td>Time On: </td>
-                            {% for event in schedule['Events'] %}
-                                <td>
-                                    {{ event['TurnOn'] }} 
-                                    {% if event.get('RandomOffset', 0) > 0 %}
-                                        &nbsp;±{{ event.get('RandomOffset', 0) }}&nbsp;mins.
-                                    {% endif %}
-                                </td>
-                            {% endfor %}
-                        </tr>
-                        <!-- Off time -->
-                        <tr>
-                            <td>Time Off: </td>
-                            {% for event in schedule['Events'] %}
-                                <td>
-                                    {{ event['TurnOff'] }} 
-                                    {% if event.get('RandomOffset', 0) > 0 %}
-                                        &nbsp;±{{ event.get('RandomOffset', 0) }}&nbsp;mins.
-                                    {% endif %}
-                                </td>
-                            {% endfor %}
-                        </tr>
-                        <!-- Days of week - itterate through the DaysEnabled list in the Event-->
-                        <tr>
-                            <td>Days of week: </td>
-                            {% for event in schedule['Events'] %}
-                                <td>
-                                    {% for day in event['DaysEnabled'] %}
-                                        {{ '✓' if day['Enabled'] else '✗' }}&nbsp;{{ day['Day'][0] }}&nbsp;&nbsp;
-                                    {% endfor %}
-
-                                </td>
-                            {% endfor %}
-                        </tr>       
-                        <!-- DatesOff - list the dates if this key exist -->
-                        <tr>
-                            <td>Dates to stay off: </td>
-                            {% for event in schedule['Events'] %}
-                                <td>
-                                    {% if event.get('DatesOff') %}
-                                        {% for date_range in event['DatesOff'] %}
-                                            &#8226; {{ date_range['StartDateAU'] }}&nbsp;&nbsp;to&nbsp;&nbsp;{{ date_range['EndDateAU'] }}<br>
-                                        {% endfor %}
-                                    {% else %}
-                                        None
-                                    {% endif %}                                        
-                                </td>
-                            {% endfor %}
-                        </tr>       
-
-
-
-                    </tbody>
-                </table>
-            </div>
-        {% endfor %}
+      <div class="card-title">{{ page_data.DeviceName }}</div>
+      <div class="card-meta" data-field="status-message">{{ page_data.LastStatusMessage }}</div>
     </div>
-    <script 
-        type="text/javascript" 
-        src="{{ url_for('static', filename='index.js') }}"
-    ></script>
-</body>
-</html>
+  </div>
+  <div class="card-content">
+    <table class="info-table">
+      <tbody>
+        <tr>
+          <td class="label">Last Check</td>
+          <td class="value" data-field="last-check">{{ page_data.LastCheck }}</td>
+        </tr>
+        {% if page_data.DuskTime %}
+        <tr>
+          <td class="label">Dusk</td>
+          <td class="value">{{ page_data.DuskTime }}</td>
+        </tr>
+        {% endif %}
+        {% if page_data.DawnTime %}
+        <tr>
+          <td class="label">Dawn</td>
+          <td class="value">{{ page_data.DawnTime }}</td>
+        </tr>
+        {% endif %}
+        {% if page_data.DebugMessage %}
+        <tr>
+          <td class="label">Debug</td>
+          <td class="value">{{ page_data.DebugMessage }}</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if page_data.HaveSwitchStates %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Switch States</span>
+  </div>
+  <div class="card-content">
+    <table class="switch-table" id="switch-states-table">
+      <thead>
+        <tr>
+          <th>Switch</th>
+          <th class="desktop-only">Schedule</th>
+          <th class="desktop-only">Input</th>
+          <th class="desktop-only">Input State</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sw in page_data.SwitchStates %}
+        <tr data-switch="{{ sw.Switch }}">
+          <td>{{ sw.Switch }}</td>
+          <td class="desktop-only">{{ sw.Schedule or '—' }}</td>
+          <td class="desktop-only">{{ sw.Input or '—' }}</td>
+          <td class="desktop-only">
+            {% if sw.InputState %}
+            <span class="status-indicator {% if sw.InputState == 'ON' %}status-indicator--active{% else %}status-indicator--inactive{% endif %}"></span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="status-badge {% if sw.OutputState == 'ON' %}on{% else %}off{% endif %}" data-field="badge">
+              {{ sw.OutputState }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% for schedule in page_data.Schedules %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Schedule: {{ schedule.Name }}</span>
+  </div>
+  <div class="card-content">
+    <table class="schedule-table">
+      <thead>
+        <tr>
+          <th>Setting</th>
+          {% for event in schedule.Events %}
+          <th>Event {{ loop.index }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Time On</td>
+          {% for event in schedule.Events %}
+          <td>{{ event.TurnOn }}{% if event.RandomOffset %} <span class="card-meta">&plusmn;{{ event.RandomOffset }} mins</span>{% endif %}</td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td>Time Off</td>
+          {% for event in schedule.Events %}
+          <td>{{ event.TurnOff }}{% if event.RandomOffset %} <span class="card-meta">&plusmn;{{ event.RandomOffset }} mins</span>{% endif %}</td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td>Days</td>
+          {% for event in schedule.Events %}
+          <td>
+            {% for day in event.DaysEnabled %}
+            <span class="day-pip {% if day.Enabled %}day-pip--on{% else %}day-pip--off{% endif %}">{{ day.Day[:1] }}</span>
+            {% endfor %}
+          </td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td>Dates Off</td>
+          {% for event in schedule.Events %}
+          <td>
+            {% if event.DatesOff %}
+            {% for rng in event.DatesOff %}
+            &bull; {{ rng.StartDateAU }} &ndash; {{ rng.EndDateAU }}<br>
+            {% endfor %}
+            {% else %}
+            <span class="card-meta">None</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block ws_handler %}
+    if (msg.type === 'state_update' && msg.state_file_type === 'LightingControl') {
+      var s = msg.summary;
+      if (!s) return;
+      var sm = document.querySelector('[data-field="status-message"]');
+      if (sm) sm.textContent = s.LastStatusMessage;
+      var lc = document.getElementById('last-check');
+      if (lc) lc.textContent = s.LastCheck;
+      var chk = document.querySelector('[data-field="last-check"]');
+      if (chk) chk.textContent = s.LastCheck;
+      if (s.SwitchStates) {
+        s.SwitchStates.forEach(function (sw) {
+          var row = document.querySelector('tr[data-switch="' + sw.Switch + '"]');
+          if (!row) return;
+          var badge = row.querySelector('[data-field="badge"]');
+          if (badge) { badge.textContent = sw.OutputState; badge.className = 'status-badge ' + (sw.OutputState === 'ON' ? 'on' : 'off'); }
+        });
+      }
+    }
+{% endblock %}

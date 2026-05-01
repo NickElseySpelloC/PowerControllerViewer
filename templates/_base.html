@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}PowerControllerViewer{% endblock %}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<header>
+  <a class="header-home" href="{{ page_data.home_url }}">PowerController Viewer</a>
+  <span id="clock"></span>
+</header>
+
+{% block body %}{% endblock %}
+
+<p id="page-footer">Last update: <span id="last-check">{{ page_data.LastCheck }}</span>{% block footer_extra %}{% endblock %}</p>
+
+<script>
+  // ── Live clock ──────────────────────────────────────────────────────────────
+  function updateClock() {
+    var now = new Date();
+    var h = String(now.getHours()).padStart(2, '0');
+    var m = String(now.getMinutes()).padStart(2, '0');
+    var s = String(now.getSeconds()).padStart(2, '0');
+    var el = document.getElementById('clock');
+    if (el) el.textContent = h + ':' + m + ':' + s;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // ── WebSocket client ────────────────────────────────────────────────────────
+  (function () {
+    var WS_KEY = "{{ page_data.AccessKey or '' }}";
+    var wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+    if (WS_KEY) wsUrl += '?key=' + encodeURIComponent(WS_KEY);
+
+    var ws;
+    var reconnectDelay = 3000;
+
+    function connect() {
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = function () {
+        reconnectDelay = 3000;
+      };
+
+      ws.onmessage = function (event) {
+        try {
+          var msg = JSON.parse(event.data);
+          handleWsMessage(msg);
+        } catch (e) { /* ignore */ }
+      };
+
+      ws.onclose = function () {
+        setTimeout(connect, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, 60000);
+      };
+
+      ws.onerror = function () {
+        ws.close();
+      };
+    }
+
+    connect();
+  })();
+
+  // ── Page-specific WS handler (override in child templates) ──────────────────
+  function handleWsMessage(msg) {
+    {% block ws_handler %}{% endblock %}
+  }
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

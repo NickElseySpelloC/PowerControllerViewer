@@ -1,74 +1,59 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {% if page_data['RefreshDelay'] > 0 %}
-        <meta http-equiv="refresh" content="page_data['RefreshDelay']">
-    {% endif %}
-    <title>{{page_data['DeviceName']}} light change events for [date]</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
-</head>
-<body>
+{% extends "_base.html" %}
+
+{% block title %}{{ page_data.DeviceName }} — {{ page_data.DateLong }}{% endblock %}
+
+{% block body %}
+<div class="nav-bar">
+  <a href="{{ page_data.home_url }}" class="btn">Home</a>
+  <a href="{{ page_data.summary_url }}" class="btn">Summary</a>
+  {% if page_data.prev_day_url %}
+  <a href="{{ page_data.prev_day_url }}" class="btn">&lsaquo; Previous Day</a>
+  {% else %}
+  <span class="btn btn--disabled">&lsaquo; Previous Day</span>
+  {% endif %}
+  {% if page_data.next_day_url %}
+  <a href="{{ page_data.next_day_url }}" class="btn">Next Day &rsaquo;</a>
+  {% else %}
+  <span class="btn btn--disabled">Next Day &rsaquo;</span>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-header">
     <div>
-        <h1>Daily light change events for {{page_data['DeviceName']}} for {{page_data['DateLong']}}</h1>
-
-        <!-- Navigation Buttons -->
-        <div>
-            <a href="{{ url_for('views.home', key=page_data['AccessKey']) }}" 
-               class="btn">
-               Home
-            </a>
-            <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=page_data['PreviousDay'], key=page_data['AccessKey']) }}" 
-               class="btn{% if page_data['PreviousDay'] is none %} btn--disabled{% endif %}">
-                Previous Day
-            </a>
-            <a href="{{ url_for('views.day_detail', state_idx=page_data['CurrentIndex'], day=page_data['NextDay'], key=page_data['AccessKey']) }}" 
-               class="btn{% if page_data['NextDay'] is none %} btn--disabled{% endif %}">
-                Next Day
-            </a>
-            <a href="{{ url_for('views.summary', state_idx=page_data['CurrentIndex'], key=page_data['AccessKey']) }}" 
-                class="btn">
-                Back to Summary
-            </a>
-        </div>
-
-        <!-- Events Table -->
-         {% if page_data['HaveEvents'] %}
-            <table>
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Switch</th>
-                        <th>Trigger</th>
-                        <th>New State</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for event in page_data['Events']|reverse %}
-                        <tr>
-                            <td>{{ event['Time'] }}</td>
-                            <td>{{ event['Switch'] }}</td>
-                            <td>{{ event['Trigger'] }}</td>
-                            <td>
-                                {% if event['State'] == 'ON' %} 
-                                    <span class="status-indicator status-indicator--active"></span> On
-                                {% else %}
-                                    <span class="status-indicator status-indicator--inactive"></span> Off
-                                {% endif %}   
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p>No events recorded for this day.</p>
-        {% endif %}
+      <div class="card-title">{{ page_data.DeviceName }}</div>
+      <div class="card-meta">{{ page_data.DateLong }}</div>
     </div>
-    <script 
-        type="text/javascript" 
-        src="{{ url_for('static', filename='index.js') }}"
-    ></script>
-</body>
-</html>
+  </div>
+  <div class="card-content">
+    {% if page_data.HaveEvents %}
+    <table class="switch-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Switch</th>
+          <th class="desktop-only">Trigger</th>
+          <th>State</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in page_data.Events | reverse %}
+        <tr>
+          <td>{{ event.Time }}</td>
+          <td>{{ event.Switch }}</td>
+          <td class="desktop-only">{{ event.Trigger }}</td>
+          <td>
+            <span class="status-badge {% if event.State == 'ON' %}on{% else %}off{% endif %}">
+              {{ event.State }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="card-meta">No events recorded for this day.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
