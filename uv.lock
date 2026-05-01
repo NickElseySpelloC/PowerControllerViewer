@@ -666,7 +666,7 @@ wheels = [
 
 [[package]]
 name = "powercontrollerviewer"
-version = "2.0.0"
+version = "2.0.1"
 source = { virtual = "." }
 dependencies = [
     { name = "cerberus" },
@@ -693,7 +693,7 @@ requires-dist = [
     { name = "python-dateutil", specifier = ">=2.9.0.post0" },
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "requests", specifier = ">=2.32.3" },
-    { name = "sc-foundation-services", specifier = ">=3.0.3" },
+    { name = "sc-foundation-services", specifier = ">=3.0.4" },
     { name = "wheel", specifier = ">=0.45.1" },
 ]
 
@@ -821,7 +821,7 @@ wheels = [
 
 [[package]]
 name = "sc-foundation-services"
-version = "3.0.3"
+version = "3.0.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "astral" },
@@ -835,9 +835,9 @@ dependencies = [
     { name = "tzfpy" },
     { name = "validators" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/d1/d62bf2269156359a30f710ff8defccbe4bd12885844a843274b259db7173/sc_foundation_services-3.0.3.tar.gz", hash = "sha256:f3918498cc65706e7a30daf7ae80b32915e7d117fb37ccedd2ef06b67f351815", size = 35337, upload-time = "2026-04-20T04:36:31.387Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9d/63/29ad1e38ac36b35f670416c40b0dadcf3b353144734f0a803bfd1a24dfaf/sc_foundation_services-3.0.4.tar.gz", hash = "sha256:4da110814155fe6ac04b0106af98271d0a21d27aaeec82e565860863b733cac3", size = 35347, upload-time = "2026-04-27T04:28:45.087Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8b/45/f95323cb58d390242740b14f156cfd78b5b7abc6560a82893b4a08107909/sc_foundation_services-3.0.3-py3-none-any.whl", hash = "sha256:c808699a7077a48e61153f948d92fce683cfccece170df24924dd45d9f296a01", size = 30564, upload-time = "2026-04-20T04:36:29.945Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/27/9838fc9f7404b52888153c576b5fbf004f710e39b556178a4d9ee7b24e3f/sc_foundation_services-3.0.4-py3-none-any.whl", hash = "sha256:aff7761db5fb0b957ea5e4eb763f299bc181b1153804cf271fd97e419e08f06f", size = 30554, upload-time = "2026-04-27T04:28:43.086Z" },
 ]
 
 [[package]]
