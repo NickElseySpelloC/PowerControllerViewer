@@ -363,47 +363,129 @@ header h1 {
   background: #fff;
 }
 
-/* ── Temperature display (kiosk page — iPad Air Gen 2 safe, no clamp()) ─────── */
+/* ── Temperature display ─────────────────────────────────────────────────────── */
 
 .temp-display__name {
-  font-size: 4.0vw;  /* vw fallback for older browsers */
+  font-size: clamp(0.75rem, 2.3vw, 6rem);
   text-align: center;
   color: #16213e;
   font-weight: 600;
-}
-
-.temp-display__time {
-  font-size: 2.0vw;
-  color: #777;
+  line-height: 1.0;
 }
 
 .temp-display__value {
-  font-size: 12.0vw;
-  text-align: center;
+  font-size: clamp(3.5rem, 8.0vw, 5.0rem);
   font-weight: 300;
-  line-height: 1;
+  line-height: 1.3;
   color: #16213e;
 }
 
 .temp-display__decimal {
-  font-size: 6.0vw;
-  text-align: center;
-}
-
-.temp-display__unit {
-  vertical-align: top;
-  font-size: 2.5vw;
-  color: #555;
+  font-size: clamp(1.2rem, 2.75vw, 2.25rem);
+  vertical-align: baseline;
 }
 
 .temp-display__not-available {
-  font-size: 4.0vw;
+  font-size: clamp(3.5rem, 8.0vw, 5.0rem);
+  font-weight: 300;
+  line-height: 1.3;
   color: #aaa;
 }
 
-.temp-display__chart-container {
-  padding: 0.5rem 0;
+/* ── Temp probes page grid layout ────────────────────────────────────────────── */
+
+.tp-page {
+  display: grid;
+  grid-template-areas:
+    "probes"
+    "smart";
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr auto;
+  gap: 0.75rem;
+  height: calc(100vh - 140px);
+  padding: 0 0.75rem 0.75rem;
+  overflow: hidden;
+}
+
+.tp-page--has-charts {
+  grid-template-areas:
+    "probes charts"
+    "smart  charts";
+  grid-template-columns: 300px 1fr;
+}
+
+/* Cards inside the grid don't use the standard margin */
+.tp-page .card { margin: 0; }
+
+.tp-probes {
+  grid-area: probes;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tp-probes .card-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tp-probes__grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  align-content: center;
+}
+
+.tp-probes__grid--2col {
+  grid-template-columns: 1fr 1fr;
+}
+
+.tp-probe-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
+  padding: 0.25rem 0.5rem;
+}
+
+.tp-probe-cell .temp-reading {
+  line-height: 1;
+}
+
+.tp-smart {
+  grid-area: smart;
+}
+
+.tp-charts {
+  grid-area: charts;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.tp-chart-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tp-chart-card .card-content {
+  flex: 1;
+  min-height: 0;
+  padding: 0.5rem 0.75rem;
+  overflow: hidden;
+}
+
+.tp-chart-card canvas {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* ── Smart device indicators (temp probes page) ─────────────────────────────── */
@@ -412,9 +494,17 @@ header h1 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem 0;
+  padding: 0.05rem 0;
   font-size: 0.85rem;
   color: #555;
+}
+
+.tp-smart .card-header {
+  padding: 0.4rem 1rem;
+}
+
+.tp-smart .card-content {
+  padding: 0.4rem 1rem;
 }
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */

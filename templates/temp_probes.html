@@ -17,71 +17,64 @@
   {% endif %}
 </div>
 
-<!-- Temperature display — iPad Air Gen 2 safe (no clamp(), vw units only) -->
-<div class="card">
-  <div class="card-header">
-    <span class="card-title">{{ page_data.DeviceName }}</span>
-    <span class="card-meta" id="current-time">{{ page_data.CurrentTime }}</span>
-  </div>
-  <div class="card-content">
-    <table style="width:100%; border-collapse:collapse;" id="probe-table">
-      <tbody>
-        <tr>
-          {% for probe in page_data.TempProbes %}
-          <td style="text-align:center; padding:0.5rem;" data-probe="{{ probe.Name }}">
-            <div class="temp-display__name">{{ probe.Name }}</div>
+<div class="tp-page{% if page_data.ChartsEnabled %} tp-page--has-charts{% endif %}">
+
+  <div class="card tp-probes">
+    <div class="card-header">
+      <span class="card-title">{{ page_data.DeviceName }}</span>
+    </div>
+    <div class="card-content">
+      <div class="tp-probes__grid{% if page_data.TempProbes | length >= 4 %} tp-probes__grid--2col{% endif %}">
+        {% for probe in page_data.TempProbes %}
+        <div class="tp-probe-cell" data-probe-value="{{ probe.Name }}">
+          <div class="temp-display__name">{{ probe.Name }}</div>
+          <div class="temp-reading">
             {% if probe.HaveTemperature %}
-            <div class="temp-display__time">({{ probe.LastReadingTime }})</div>
-            {% endif %}
-          </td>
-          {% endfor %}
-        </tr>
-        <tr>
-          {% for probe in page_data.TempProbes %}
-          <td style="text-align:center; padding:0.25rem;" data-probe-value="{{ probe.Name }}">
-            {% if probe.HaveTemperature %}
-            <span class="temp-display__value">{{ probe.TemperatureInteger }}</span><span class="temp-display__decimal">.{{ probe.TemperatureDecimal }}</span><span class="temp-display__unit">&deg;C</span>
+            <span class="temp-display__value">{{ probe.TemperatureInteger }}</span><span class="temp-display__decimal">.{{ probe.TemperatureDecimal }}</span>
             {% else %}
             <span class="temp-display__not-available">N/A</span>
             {% endif %}
-          </td>
-          {% endfor %}
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-{% if page_data.SmartDevices %}
-<div class="card">
-  <div class="card-header">
-    <span class="card-title">Smart Devices</span>
-  </div>
-  <div class="card-content">
-    <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:center;">
-      {% for device in page_data.SmartDevices %}
-      <div class="smart-device-row">
-        <span class="status-indicator {% if device.IsOn %}status-indicator--active{% else %}status-indicator--inactive{% endif %}"></span>
-        {{ device.Name }}
+          </div>
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
     </div>
   </div>
-</div>
-{% endif %}
 
-{% if page_data.ChartsEnabled %}
-{% for chart in page_data.ChartsData %}
-<div class="card">
-  <div class="card-header">
-    <span class="card-title">{{ chart.name }}</span>
+  {% if page_data.SmartDevices %}
+  <div class="card tp-smart">
+    <div class="card-header">
+      <span class="card-title">Smart Devices</span>
+    </div>
+    <div class="card-content">
+      <div style="display:flex; gap:1.5rem; flex-wrap:wrap; align-items:center;">
+        {% for device in page_data.SmartDevices %}
+        <div class="smart-device-row">
+          <span class="status-indicator {% if device.IsOn %}status-indicator--active{% else %}status-indicator--inactive{% endif %}"></span>
+          {{ device.Name }}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
   </div>
-  <div class="card-content temp-display__chart-container">
-    <canvas id="chart-{{ loop.index0 }}"></canvas>
+  {% endif %}
+
+  {% if page_data.ChartsEnabled %}
+  <div class="tp-charts">
+    {% for chart in page_data.ChartsData %}
+    <div class="card tp-chart-card">
+      <div class="card-header">
+        <span class="card-title">{{ chart.name }}</span>
+      </div>
+      <div class="card-content">
+        <canvas id="chart-{{ loop.index0 }}"></canvas>
+      </div>
+    </div>
+    {% endfor %}
   </div>
+  {% endif %}
+
 </div>
-{% endfor %}
-{% endif %}
 {% endblock %}
 
 {% block footer_extra %} &mdash; {{ page_data.TempProbes | length }} probe{% if page_data.TempProbes | length != 1 %}s{% endif %}{% endblock %}
@@ -113,6 +106,7 @@
       data: { datasets: datasets },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         scales: {
           x: { type: 'time', time: { tooltipFormat: 'dd MMM HH:mm' }, ticks: { maxTicksLimit: 8 } },
           y: { title: { display: true, text: '°C' } },
@@ -133,25 +127,16 @@
       var lc = document.getElementById('last-check');
       if (lc) lc.textContent = s.LastCheck;
       s.TempProbes.forEach(function (probe) {
-        var valCell = document.querySelector('[data-probe-value="' + probe.Name + '"]');
-        if (!valCell) return;
+        var cell = document.querySelector('[data-probe-value="' + probe.Name + '"]');
+        if (!cell) return;
+        var reading = cell.querySelector('.temp-reading');
+        if (!reading) return;
         if (probe.HaveTemperature) {
-          valCell.innerHTML = '<span class="temp-display__value">' + probe.TemperatureInteger + '</span>'
-            + '<span class="temp-display__decimal">.' + probe.TemperatureDecimal + '</span>'
-            + '<span class="temp-display__unit">&deg;C</span>';
+          reading.innerHTML = '<span class="temp-display__value">' + probe.TemperatureInteger + '</span>'
+            + '<span class="temp-display__decimal">.' + probe.TemperatureDecimal + '</span>';
         } else {
-          valCell.innerHTML = '<span class="temp-display__not-available">N/A</span>';
-        }
-        var nameCell = document.querySelector('[data-probe="' + probe.Name + '"]');
-        if (nameCell && probe.HaveTemperature) {
-          var timeEl = nameCell.querySelector('.temp-display__time');
-          if (timeEl) timeEl.textContent = '(' + probe.LastReadingTime + ')';
+          reading.innerHTML = '<span class="temp-display__not-available">N/A</span>';
         }
       });
-      var ct = document.getElementById('current-time');
-      if (ct) {
-        var now = new Date();
-        ct.textContent = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':' + String(now.getSeconds()).padStart(2,'0');
-      }
     }
 {% endblock %}
