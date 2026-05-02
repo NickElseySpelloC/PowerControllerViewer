@@ -26,6 +26,11 @@ def build_lighting_view(
     dusk = state.get("Dusk")
     dawn = state.get("Dawn")
 
+    # Build a set of known schedule names so we can distinguish schedule triggers
+    # from physical input triggers in SwitchStates (both arrive in the "Input" field).
+    schedule_names = {s.get("Name") for s in (state.get("Schedules") or [])} - {None}
+    switch_states = _enrich_switch_states(state.get("SwitchStates") or [], schedule_names)
+
     return {
         "home_url": nav_url("/", key),
         "AccessKey": key,
@@ -41,7 +46,7 @@ def build_lighting_view(
         "DuskTime": dusk.strftime("%H:%M") if isinstance(dusk, dt.datetime) else None,
         "DawnTime": dawn.strftime("%H:%M") if isinstance(dawn, dt.datetime) else None,
         "HaveSwitchStates": bool(state.get("SwitchStates")),
-        "SwitchStates": state.get("SwitchStates") or [],
+        "SwitchStates": switch_states,
         "HaveEvents": bool(switch_events),
         "Schedules": schedules,
         "DebugMessage": debug_message,
@@ -54,7 +59,16 @@ def build_lighting_ws_update(state: dict) -> dict:
     return {
         "LastStatusMessage": state.get("LastStatusMessage") or "",
         "LastCheck": format_date_with_ordinal(state.get("LocalLastSaveTime"), show_time=True),
-        "SwitchStates": switch_states,
+        # Only include the fields the JS handler reads; raw state may contain
+        # datetime.time objects that are not JSON-serialisable.
+        "SwitchStates": [
+            {
+                "Switch": sw.get("Switch"),
+                "OutputState": sw.get("OutputState"),
+                "InputState": sw.get("InputState"),
+            }
+            for sw in switch_states
+        ],
     }
 
 
@@ -105,6 +119,24 @@ def build_lighting_daily_view(
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
+
+def _enrich_switch_states(switch_states: list[dict], schedule_names: set[str]) -> list[dict]:
+    """Separate schedule triggers from physical input triggers.
+
+    In the raw state, both arrive in the 'Input' field.  If the value matches a
+    known schedule name we promote it to a 'Schedule' field and clear 'Input' so
+    the template can display them in distinct columns.
+    """
+    result = []
+    for sw in switch_states:
+        sw = dict(sw)  # shallow copy — don't mutate shared state
+        input_val = sw.get("Input")
+        if not sw.get("Schedule") and input_val and input_val in schedule_names:
+            sw["Schedule"] = input_val
+            sw["Input"] = None
+        result.append(sw)
+    return result
+
 
 def _enrich_schedules(schedules: list[dict]) -> list[dict]:
     """Add DaysEnabled list and formatted DatesOff to each schedule event."""

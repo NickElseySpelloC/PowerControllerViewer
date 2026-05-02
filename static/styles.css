@@ -419,7 +419,7 @@ header h1 {
 
 /* ── Responsive ─────────────────────────────────────────────────────────────── */
 
-.desktop-only { display: block; }
+.desktop-only { display: table-cell; }
 .mobile-only  { display: none; }
 
 @media (max-width: 600px) {
@@ -454,5 +454,5 @@ header h1 {
 
 @media (min-width: 481px) {
   .mobile-only  { display: none !important; }
-  .desktop-only { display: block !important; }
+  .desktop-only { display: table-cell !important; }
 }

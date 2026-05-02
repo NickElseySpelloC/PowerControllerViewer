@@ -31,26 +31,8 @@
   updateClock();
   setInterval(updateClock, 1000);
 
-  // ── Format current browser time as "D Mon HH:MM:SS" ────────────────────────
-  function nowStr() {
-    var now = new Date();
-    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    var d = now.getDate();
-    var mon = months[now.getMonth()];
-    var h = String(now.getHours()).padStart(2, '0');
-    var m = String(now.getMinutes()).padStart(2, '0');
-    var s = String(now.getSeconds()).padStart(2, '0');
-    return d + ' ' + mon + ' ' + h + ':' + m + ':' + s;
-  }
-
-  // ── Update footer "Last update" with current browser time ──────────────────
-  function updateFooterNow() {
-    var lc = document.getElementById('last-check');
-    if (lc) lc.textContent = nowStr();
-  }
-
   // ── Device this page is showing (empty on the home page) ────────────────────
-  var PAGE_DEVICE = "{{ page_data.DeviceName | default('') | e }}";
+  var PAGE_DEVICE = "{{ (page_data.PageDevice or page_data.DeviceName) | default('') | e }}";
 
   // ── WebSocket client ────────────────────────────────────────────────────────
   (function () {
@@ -87,6 +69,11 @@
 
     connect();
   })();
+
+  // ── Periodic hard-refresh (safety net for any missed WS updates) ───────────
+  {% if page_data.RefreshDelay %}
+  setTimeout(function () { window.location.reload(); }, {{ page_data.RefreshDelay * 1000 }});
+  {% endif %}
 
   // ── WS handler — child templates override this block ────────────────────────
   function handleWsMessage(msg) {

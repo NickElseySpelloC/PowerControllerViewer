@@ -61,6 +61,7 @@ def build_power_view(
         "RefreshDelay": refresh_delay,
         "state_file_type": "PowerController",
         "DeviceName": output.get("Name") or state.get("DeviceName") or "Unknown",
+        "PageDevice": state.get("DeviceName") or "Unknown",  # canonical key used for WS matching
         "next_url": nav_url("/summary", key, state_idx=next_idx) if next_idx is not None else None,
         "NextDeviceName": (next_state.get("Output", {}).get("Name") or next_state.get("DeviceName")) if next_state else None,
         "daily_url": nav_url("/daily", key, state_idx=state_idx),

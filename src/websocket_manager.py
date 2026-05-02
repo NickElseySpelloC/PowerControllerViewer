@@ -1,11 +1,26 @@
 """WebSocket connection manager."""
 import contextlib
+import datetime as dt
+import json
 import logging
 
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
 
 log = logging.getLogger(__name__)
+
+
+def _ws_dumps(data: dict) -> str:
+    """JSON-serialise a WebSocket payload, converting Python date/time types to strings."""
+    def _default(obj):
+        if isinstance(obj, dt.datetime):
+            return obj.isoformat()
+        if isinstance(obj, dt.date):
+            return obj.isoformat()
+        if isinstance(obj, dt.time):
+            return obj.strftime("%H:%M:%S")
+        return str(obj)
+    return json.dumps(data, default=_default)
 
 
 class ConnectionManager:

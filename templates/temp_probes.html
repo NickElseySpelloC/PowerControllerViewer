@@ -130,7 +130,8 @@
     if (msg.type === 'state_update' && msg.state_file_type === 'TempProbes') {
       var s = msg.summary;
       if (!s || !s.TempProbes) return;
-      updateFooterNow();
+      var lc = document.getElementById('last-check');
+      if (lc) lc.textContent = s.LastCheck;
       s.TempProbes.forEach(function (probe) {
         var valCell = document.querySelector('[data-probe-value="' + probe.Name + '"]');
         if (!valCell) return;

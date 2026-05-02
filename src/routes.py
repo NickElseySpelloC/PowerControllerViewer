@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from ingest import handle_submit
+from websocket_manager import _ws_dumps
 from view_models.home import build_home_device_ws, build_home_view
 from view_models.lighting import (
     build_lighting_daily_view,
@@ -228,10 +229,10 @@ def register_routes(app, templates: Jinja2Templates, config, logger, state_store
         # Send initial home-page snapshot so clients can update immediately
         with contextlib.suppress(Exception):
             all_states = _all_states_indexed()
-            await ws_manager.send(websocket, {
+            await websocket.send_text(_ws_dumps({
                 "type": "initial",
                 "devices": [build_home_device_ws(s) for s in all_states],
-            })
+            }))
 
         async def _sender():
             """Read state-change notifications and push them to this connection only."""
@@ -241,10 +242,10 @@ def register_routes(app, templates: Jinja2Templates, config, logger, state_store
                     # Handle deletion notifications
                     if notification.startswith("__deleted__:"):
                         deleted_name = notification[len("__deleted__:"):]
-                        await websocket.send_json({
+                        await websocket.send_text(_ws_dumps({
                             "type": "device_deleted",
                             "device_name": deleted_name,
-                        })
+                        }))
                         continue
 
                     device_name = notification
@@ -265,7 +266,7 @@ def register_routes(app, templates: Jinja2Templates, config, logger, state_store
                     elif stype == "TempProbes":
                         msg["summary"] = build_temp_probes_ws_update(state)
                     log.debug("WS send: %s → %s", msg["type"], device_name)
-                    await websocket.send_json(msg)
+                    await websocket.send_text(_ws_dumps(msg))
                 except asyncio.CancelledError:
                     raise
                 except Exception:

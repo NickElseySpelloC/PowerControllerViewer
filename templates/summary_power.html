@@ -112,23 +112,6 @@
 
 {% block ws_handler %}
     if (msg.type === 'state_update' && msg.device_name === PAGE_DEVICE && msg.state_file_type === 'PowerController') {
-      var s = msg.summary;
-      if (!s) return;
-      function patch(field, val) {
-        var el = document.querySelector('[data-field="' + field + '"]');
-        if (el && val !== undefined) el.textContent = val;
-      }
-      var isOn = s.IsDeviceRunning;
-      patch('pump-status', s.PumpStatus);
-      patch('status-message', s.StatusMessage);
-      patch('last-check', s.LastCheck);
-      patch('actual-runtime', s.ActualRuntime);
-      patch('remaining-runtime', s.RemainingRuntime);
-      patch('current-price', s.CurrentPrice);
-      var badge = document.querySelector('[data-field="badge"]');
-      if (badge) { badge.textContent = isOn ? 'ON' : 'OFF'; badge.className = 'status-badge ' + (isOn ? 'on' : 'off'); }
-      var ind = document.querySelector('[data-field="indicator"]');
-      if (ind) ind.className = 'status-indicator ' + (isOn ? 'status-indicator--active' : 'status-indicator--inactive');
-      updateFooterNow();
+      window.location.reload();
     }
 {% endblock %}

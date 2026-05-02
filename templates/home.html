@@ -3,11 +3,12 @@
 {% block title %}PowerControllerViewer — Devices{% endblock %}
 
 {% block body %}
+{% for group in page_data.DeviceGroups %}
 <div class="card">
   <div class="card-header">
     <div>
-      <div class="card-title">Devices</div>
-      <div class="card-meta">{{ page_data.Devices | length }} device{% if page_data.Devices | length != 1 %}s{% endif %} reporting</div>
+      <div class="card-title">{{ group.TypeLabel }}</div>
+      <div class="card-meta">{{ group.Devices | length }} device{% if group.Devices | length != 1 %}s{% endif %}</div>
     </div>
   </div>
   <div class="card-content">
@@ -16,12 +17,11 @@
         <tr>
           <th>Device</th>
           <th class="desktop-only">Last Update</th>
-          <th class="desktop-only">Type</th>
           <th>Status</th>
         </tr>
       </thead>
       <tbody>
-        {% for device in page_data.Devices %}
+        {% for device in group.Devices %}
         <tr data-device-name="{{ device.DeviceName }}">
           <td>
             <a href="{{ device.summary_url }}">{{ device.DeviceName }}</a>
@@ -29,8 +29,7 @@
             <div class="card-meta">{{ device.DeviceDescription }}</div>
             {% endif %}
           </td>
-          <td class="desktop-only" data-field="last-check">{{ device.LastCheck }}</td>
-          <td class="desktop-only">{{ device.StateFileType }}</td>
+          <td class="desktop-only" data-field="last-check" data-iso="{{ device.LastCheckISO | default('') }}">{{ device.LastCheck }}</td>
           <td>
             <span class="status-indicator {% if device.IsDeviceRunning %}status-indicator--active{% else %}status-indicator--inactive{% endif %}" data-field="indicator"></span>
             <span data-field="status">{{ device.Status }}</span>
@@ -41,14 +40,22 @@
     </table>
   </div>
 </div>
+{% endfor %}
 {% endblock %}
 
 {% block ws_handler %}
     if (msg.type === 'device_deleted') {
-      // Remove the deleted device's row; reload if none left
       var delRow = document.querySelector('tr[data-device-name="' + msg.device_name + '"]');
-      if (delRow) delRow.remove();
-      if (!document.querySelector('tbody tr[data-device-name]')) window.location.reload();
+      if (delRow) {
+        var tbody = delRow.closest('tbody');
+        delRow.remove();
+        // If its group table is now empty, reload so the section header is removed
+        if (tbody && !tbody.querySelector('tr[data-device-name]')) {
+          window.location.reload(); return;
+        }
+      }
+      if (!document.querySelector('tr[data-device-name]')) { window.location.reload(); return; }
+      updateHomeFooter();
       return;
     }
     if (msg.type === 'initial' || msg.type === 'state_update') {
@@ -58,14 +65,24 @@
         var row = document.querySelector('tr[data-device-name="' + d.device_name + '"]');
         if (!row) { needsReload = true; return; }
         var chk = row.querySelector('[data-field="last-check"]');
-        if (chk) chk.textContent = d.last_check;
+        if (chk) { chk.textContent = d.last_check; chk.dataset.iso = d.last_check_iso || ''; }
         var ind = row.querySelector('[data-field="indicator"]');
         if (ind) ind.className = 'status-indicator ' + (d.is_running ? 'status-indicator--active' : 'status-indicator--inactive');
         var st = row.querySelector('[data-field="status"]');
         if (st) st.textContent = d.status;
       });
       if (needsReload) { window.location.reload(); return; }
-      // Update footer timestamp with current browser time
-      if (devices.length) updateFooterNow();
+      updateHomeFooter();
+    }
+
+    // Set footer to the most recently updated device's LastCheck text
+    function updateHomeFooter() {
+      var best = { iso: '', text: '' };
+      document.querySelectorAll('td[data-field="last-check"]').forEach(function (td) {
+        var iso = td.dataset.iso || '';
+        if (iso > best.iso) { best.iso = iso; best.text = td.textContent; }
+      });
+      var lc = document.getElementById('last-check');
+      if (lc && best.text) lc.textContent = best.text;
     }
 {% endblock %}

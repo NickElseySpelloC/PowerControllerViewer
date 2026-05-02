@@ -62,7 +62,6 @@
           <th>Switch</th>
           <th class="desktop-only">Schedule</th>
           <th class="desktop-only">Input</th>
-          <th class="desktop-only">Input State</th>
           <th>Output</th>
         </tr>
       </thead>
@@ -71,10 +70,12 @@
         <tr data-switch="{{ sw.Switch }}">
           <td>{{ sw.Switch }}</td>
           <td class="desktop-only">{{ sw.Schedule or '—' }}</td>
-          <td class="desktop-only">{{ sw.Input or '—' }}</td>
           <td class="desktop-only">
-            {% if sw.InputState %}
-            <span class="status-indicator {% if sw.InputState == 'ON' %}status-indicator--active{% else %}status-indicator--inactive{% endif %}"></span>
+            {% if sw.Input %}
+            {{ sw.Input }}
+            <span class="status-indicator {% if sw.InputState == 'ON' %}status-indicator--active{% else %}status-indicator--inactive{% endif %}" data-field="input-state"></span>
+            {% else %}
+            —
             {% endif %}
           </td>
           <td>
@@ -155,7 +156,8 @@
       if (!s) return;
       var sm = document.querySelector('[data-field="status-message"]');
       if (sm) sm.textContent = s.LastStatusMessage;
-      updateFooterNow();
+      var lc = document.getElementById('last-check');
+      if (lc) lc.textContent = s.LastCheck;
       var chk = document.querySelector('[data-field="last-check"]');
       if (chk) chk.textContent = s.LastCheck;
       if (s.SwitchStates) {
@@ -164,6 +166,8 @@
           if (!row) return;
           var badge = row.querySelector('[data-field="badge"]');
           if (badge) { badge.textContent = sw.OutputState; badge.className = 'status-badge ' + (sw.OutputState === 'ON' ? 'on' : 'off'); }
+          var inputInd = row.querySelector('[data-field="input-state"]');
+          if (inputInd) inputInd.className = 'status-indicator ' + (sw.InputState === 'ON' ? 'status-indicator--active' : 'status-indicator--inactive');
         });
       }
     }
