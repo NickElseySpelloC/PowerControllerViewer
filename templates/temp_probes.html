@@ -85,22 +85,39 @@
   var chartsData = {{ page_data.ChartsData | tojson }};
   var COLOURS = ['#2979ff','#ff6d00','#00c853','#d50000','#aa00ff','#00b8d4','#ffd600','#64dd17'];
 
+  var GAP_MS = 24 * 60 * 60 * 1000;  // 24 hours in milliseconds
+
   chartsData.forEach(function (chart, idx) {
     var ctx = document.getElementById('chart-' + idx);
     if (!ctx) return;
+
     var datasets = chart.datasets.map(function (ds, di) {
       var colour = ds.colour || COLOURS[di % COLOURS.length];
+
+      // Build {x, y} pairs and insert a null point wherever consecutive readings
+      // are more than 24 hours apart, which breaks the line at that gap.
+      var raw = ds.timestamps.map(function (t, i) { return { x: t, y: ds.temperatures[i] }; });
+      var data = raw.length ? [raw[0]] : [];
+      for (var i = 1; i < raw.length; i++) {
+        if (raw[i].x - raw[i - 1].x > GAP_MS) {
+          data.push({ x: raw[i - 1].x, y: null });
+        }
+        data.push(raw[i]);
+      }
+
       return {
         label: ds.display_name,
-        data: ds.timestamps.map(function (t, i) { return { x: t, y: ds.temperatures[i] }; }),
+        data: data,
         borderColor: colour,
-        backgroundColor: colour + '22',
+        backgroundColor: colour,
         borderWidth: 1.5,
-        pointRadius: 0,
+        pointRadius: 2,
         fill: false,
         tension: 0.2,
+        spanGaps: false,
       };
     });
+
     new Chart(ctx, {
       type: 'line',
       data: { datasets: datasets },
@@ -108,10 +125,37 @@
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-          x: { type: 'time', time: { tooltipFormat: 'dd MMM HH:mm' }, ticks: { maxTicksLimit: 8 } },
+          x: {
+            type: 'time',
+            min: chart.x_min,
+            max: chart.x_max,
+            time: {
+              tooltipFormat: 'dd MMM HH:mm',
+              displayFormats: {
+                hour: 'd MMM HH:mm',
+                day:  'd MMM',
+              },
+            },
+            ticks: { maxTicksLimit: 8 },
+          },
           y: { title: { display: true, text: '°C' } },
         },
-        plugins: { legend: { position: 'top' } },
+        plugins: {
+          legend: {
+            display: datasets.length > 1,
+            labels: {
+              boxWidth: 36,
+              boxHeight: 3,
+              generateLabels: function (c) {
+                return Chart.defaults.plugins.legend.labels.generateLabels(c).map(function (l) {
+                  l.fillStyle = l.strokeStyle;  // solid fill matching line colour
+                  l.lineWidth = 0;              // no box border
+                  return l;
+                });
+              },
+            },
+          },
+        },
         animation: false,
       },
     });

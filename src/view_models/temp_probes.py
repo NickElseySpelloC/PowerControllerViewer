@@ -108,7 +108,7 @@ def _build_charts_data(charting: dict, probe_history: list[dict], probe_config: 
                     "colour": p.get("Colour"),
                 }
 
-        # Gather time series per probe
+        # Gather time series per probe — timestamps as ms since epoch (unambiguous for JS)
         series: dict[str, tuple[list, list]] = {}
         for entry in probe_history:
             pname = entry.get("ProbeName")
@@ -120,15 +120,17 @@ def _build_charts_data(charting: dict, probe_history: list[dict], probe_config: 
                 continue
             if pname not in series:
                 series[pname] = ([], [])
-            series[pname][0].append(ts.isoformat())
+            series[pname][0].append(int(ts.timestamp() * 1000))
             series[pname][1].append(temp)
 
         datasets = []
+        all_timestamps: list[int] = []
         for pname in probe_names_cfg:
             if pname not in series:
                 continue
             meta = probe_meta.get(pname) or {}
             timestamps, temps = series[pname]
+            all_timestamps.extend(timestamps)
             datasets.append({
                 "probe_name": pname,
                 "display_name": meta.get("display_name") or pname,
@@ -141,6 +143,8 @@ def _build_charts_data(charting: dict, probe_history: list[dict], probe_config: 
             charts.append({
                 "name": chart_cfg.get("Name") or "",
                 "datasets": datasets,
+                "x_min": min(all_timestamps),
+                "x_max": max(all_timestamps),
             })
 
     return charts
