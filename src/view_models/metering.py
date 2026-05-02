@@ -193,7 +193,7 @@ def _build_reporting_periods(
     current_month_end = max(yesterday, this_month_start)
 
     periods = [
-        ReportingPeriod("All Dates", summary.get("FirstDate"), summary.get("LastDate")),
+        ReportingPeriod("All Dates", summary.get("FirstDate"), summary.get("LastDate")), # pyright: ignore[reportArgumentType]
         ReportingPeriod("Last 30 Days", today - dt.timedelta(days=30), yesterday, show=True, menu=False),
         ReportingPeriod("Last Month", last_month_start, last_month_end),
         ReportingPeriod("This Month", this_month_start, current_month_end),

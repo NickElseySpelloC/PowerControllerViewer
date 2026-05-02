@@ -1,6 +1,5 @@
 """View model for LightingControl summary and daily pages."""
 import datetime as dt
-import operator
 
 from sc_foundation import DateHelper
 
@@ -82,7 +81,7 @@ def build_lighting_daily_view(
 ) -> dict:
     switch_events = sorted(
         state.get("SwitchEvents") or [],
-        key=operator.itemgetter("Date"),
+        key=lambda event: event.get("Date") or dt.date.min,
         reverse=True,
     )
     day_data = switch_events[day] if day < len(switch_events) else {}

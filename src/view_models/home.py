@@ -121,5 +121,10 @@ def _status_text(state: dict) -> str:
 
 
 def _latest_save(all_states: list[dict]) -> dt.datetime | None:
-    times = [s.get("LocalLastSaveTime") for s in all_states if s.get("LocalLastSaveTime")]
+    times = [
+        ts
+        for s in all_states
+        for ts in [s.get("LocalLastSaveTime")]
+        if isinstance(ts, dt.datetime)
+    ]
     return max(times) if times else None

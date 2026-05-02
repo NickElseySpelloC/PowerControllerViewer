@@ -60,6 +60,7 @@ class StateStore:
         if not isinstance(raw, dict):
             return None
         decoded = JSONEncoder.decode_object(raw)
+        assert isinstance(decoded, dict)
         return self._enrich(decoded)
 
     @staticmethod
@@ -122,6 +123,7 @@ class StateStore:
         self._safe_write(file_path, raw_state)
 
         decoded = JSONEncoder.decode_object(raw_state)
+        assert isinstance(decoded, dict)
         state = self._enrich(decoded)
         state["_file_mtime"] = file_path.stat().st_mtime
         self._states[device_name] = state
