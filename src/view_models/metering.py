@@ -1,6 +1,6 @@
 """View model for OutputMetering summary page."""
 import datetime as dt
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from sc_foundation import DateHelper
 
@@ -221,9 +221,8 @@ def _calc_global_totals(state: dict, period: ReportingPeriod):
         entry_date = entry.get("Date")
         if not isinstance(entry_date, dt.date):
             continue
-        if period.start_date and period.end_date:
-            if not (period.start_date <= entry_date <= period.end_date):
-                continue
+        if period.start_date and period.end_date and not (period.start_date <= entry_date <= period.end_date):
+            continue
         period.have_global_data = True
         period.global_energy_used += entry.get("EnergyUsed") or 0.0
         period.global_cost += entry.get("Cost") or 0.0
@@ -244,10 +243,9 @@ def _calc_meter_usage(meter: dict, period: ReportingPeriod) -> dict:
     entry["HaveData"] = True
     for item in (meter.get("Usage") or []):
         item_date = item.get("Date")
-        if period.start_date and period.end_date and isinstance(item_date, dt.date):
-            if period.start_date <= item_date <= period.end_date:
-                entry["EnergyUsed"] += item.get("EnergyUsed") or 0.0
-                entry["Cost"] += item.get("Cost") or 0.0
+        if period.start_date and period.end_date and isinstance(item_date, dt.date) and period.start_date <= item_date <= period.end_date:
+            entry["EnergyUsed"] += item.get("EnergyUsed") or 0.0
+            entry["Cost"] += item.get("Cost") or 0.0
     return entry
 
 
@@ -267,30 +265,34 @@ def _format_totals(totals: list[dict], meters: list[dict]) -> list[dict]:
             period["OtherCostStr"] = f"${oc:.2f}"
             if gc > 0:
                 period["OtherCostStr"] += f" ({oc / gc * 100:.1f}%)"
-
             for meter in meters:
                 usage = (meter.get("Usage") or [])[idx] if idx < len(meter.get("Usage") or []) else {}
-                if usage.get("HaveData"):
-                    eu = usage.get("EnergyUsed") or 0
-                    if eu > 0.1:
-                        usage["EnergyUsedStr"] = f"{eu:.1f} kWh"
-                        if usage.get("EnergyUsedPcnt") is not None:
-                            usage["EnergyUsedStr"] += f" ({usage['EnergyUsedPcnt'] * 100:.1f}%)"
-                        usage["CostStr"] = f"${usage.get('Cost', 0):.2f}"
-                        if usage.get("CostPcnt") is not None:
-                            usage["CostStr"] += f" ({usage['CostPcnt'] * 100:.1f}%)"
-                    else:
-                        usage["EnergyUsedStr"] = "-"
-                        usage["CostStr"] = "-"
-                else:
-                    usage["EnergyUsedStr"] = "N/A"
-                    usage["CostStr"] = "N/A"
+                _format_meter_usage(usage)
         else:
             period["GlobalEnergyUsedStr"] = "N/A"
             period["GlobalCostStr"] = "N/A"
             period["OtherEnergyUsedStr"] = "N/A"
             period["OtherCostStr"] = "N/A"
     return totals
+
+
+def _format_meter_usage(usage: dict) -> None:
+    """Add EnergyUsedStr and CostStr display fields to a meter usage entry in-place."""
+    if not usage.get("HaveData"):
+        usage["EnergyUsedStr"] = "N/A"
+        usage["CostStr"] = "N/A"
+        return
+    eu = usage.get("EnergyUsed") or 0
+    if eu > 0.1:
+        usage["EnergyUsedStr"] = f"{eu:.1f} kWh"
+        if usage.get("EnergyUsedPcnt") is not None:
+            usage["EnergyUsedStr"] += f" ({usage['EnergyUsedPcnt'] * 100:.1f}%)"
+        usage["CostStr"] = f"${usage.get('Cost', 0):.2f}"
+        if usage.get("CostPcnt") is not None:
+            usage["CostStr"] += f" ({usage['CostPcnt'] * 100:.1f}%)"
+    else:
+        usage["EnergyUsedStr"] = "-"
+        usage["CostStr"] = "-"
 
 
 def _build_period_choices(periods: list[ReportingPeriod], period_idx: int | None) -> list[dict]:

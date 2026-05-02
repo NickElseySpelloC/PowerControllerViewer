@@ -1,5 +1,5 @@
 """WebSocket connection manager."""
-import asyncio
+import contextlib
 import logging
 
 from fastapi import WebSocket
@@ -20,10 +20,8 @@ class ConnectionManager:
         log.debug("WS client connected (%d total)", len(self._connections))
 
     def disconnect(self, ws: WebSocket):
-        try:
+        with contextlib.suppress(ValueError):
             self._connections.remove(ws)
-        except ValueError:
-            pass
         log.debug("WS client disconnected (%d remaining)", len(self._connections))
 
     async def broadcast(self, data: dict):

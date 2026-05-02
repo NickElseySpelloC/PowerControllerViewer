@@ -111,7 +111,7 @@
 {% endblock %}
 
 {% block ws_handler %}
-    if (msg.type === 'state_update' && msg.state_file_type === 'PowerController') {
+    if (msg.type === 'state_update' && msg.device_name === PAGE_DEVICE && msg.state_file_type === 'PowerController') {
       var s = msg.summary;
       if (!s) return;
       function patch(field, val) {
@@ -129,12 +129,6 @@
       if (badge) { badge.textContent = isOn ? 'ON' : 'OFF'; badge.className = 'status-badge ' + (isOn ? 'on' : 'off'); }
       var ind = document.querySelector('[data-field="indicator"]');
       if (ind) ind.className = 'status-indicator ' + (isOn ? 'status-indicator--active' : 'status-indicator--inactive');
-      var lc = document.getElementById('last-check');
-      if (lc) lc.textContent = s.LastCheck;
-    }
-    if (msg.type === 'state_update' && msg.home_device) {
-      var d = msg.home_device;
-      var lc = document.getElementById('last-check');
-      if (lc) lc.textContent = d.last_check;
+      updateFooterNow();
     }
 {% endblock %}

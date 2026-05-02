@@ -321,8 +321,9 @@ header h1 {
   text-align: right;
 }
 
-.metering-table th:first-child,
-.metering-table td:first-child {
+.metering-table thead tr:first-child th:first-child,
+.metering-table tbody td:first-child,
+.metering-table tfoot th:first-child {
   text-align: left;
 }
 

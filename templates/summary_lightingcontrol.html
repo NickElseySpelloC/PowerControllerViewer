@@ -150,13 +150,12 @@
 {% endblock %}
 
 {% block ws_handler %}
-    if (msg.type === 'state_update' && msg.state_file_type === 'LightingControl') {
+    if (msg.type === 'state_update' && msg.device_name === PAGE_DEVICE && msg.state_file_type === 'LightingControl') {
       var s = msg.summary;
       if (!s) return;
       var sm = document.querySelector('[data-field="status-message"]');
       if (sm) sm.textContent = s.LastStatusMessage;
-      var lc = document.getElementById('last-check');
-      if (lc) lc.textContent = s.LastCheck;
+      updateFooterNow();
       var chk = document.querySelector('[data-field="last-check"]');
       if (chk) chk.textContent = s.LastCheck;
       if (s.SwitchStates) {

@@ -100,6 +100,12 @@
 </div>
 {% endblock %}
 
+{% block ws_handler %}
+    if (msg.type === 'state_update' && msg.device_name === PAGE_DEVICE) {
+      window.location.reload();
+    }
+{% endblock %}
+
 {% block scripts %}
 <script>
   (function () {

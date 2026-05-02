@@ -1,20 +1,18 @@
 """Periodic async housekeeping task (config reload, log trimming, stale file deletion)."""
 import asyncio
+import contextlib
 import logging
+
+from sc_foundation import DateHelper
 
 log = logging.getLogger(__name__)
 
-_INTERVAL_SECONDS = 60
+_INTERVAL_SECONDS = 10
 
 
 async def housekeeping_loop(config, logger, state_store):
     """Run indefinitely; performs maintenance every _INTERVAL_SECONDS seconds."""
-    config_last_check = None
-    try:
-        from sc_foundation import DateHelper
-        config_last_check = DateHelper.now()
-    except Exception:  # noqa: BLE001
-        pass
+    config_last_check = DateHelper.now()
 
     while True:
         await asyncio.sleep(_INTERVAL_SECONDS)
@@ -27,17 +25,14 @@ async def housekeeping_loop(config, logger, state_store):
                     email = config.get_email_settings()
                     if email:
                         logger.register_email_settings(email)
-                    from sc_foundation import DateHelper
                     config_last_check = DateHelper.now()
                     log.info("Config reloaded.")
             except Exception as e:  # noqa: BLE001
                 logger.log_message(f"Housekeeping: config check error: {e}", "warning")
 
             # Trim log file
-            try:
+            with contextlib.suppress(Exception):
                 logger.trim_logfile()
-            except Exception:  # noqa: BLE001
-                pass
 
             # Delete old state files
             try:
@@ -47,7 +42,7 @@ async def housekeeping_loop(config, logger, state_store):
             except Exception as e:  # noqa: BLE001
                 logger.log_message(f"Housekeeping: file deletion error: {e}", "warning")
 
-            # Pick up externally added/modified state files
+            # Pick up externally added/modified/deleted state files
             try:
                 await state_store.check_external_changes()
             except Exception as e:  # noqa: BLE001
@@ -55,5 +50,5 @@ async def housekeeping_loop(config, logger, state_store):
 
         except asyncio.CancelledError:
             raise
-        except Exception as e:  # noqa: BLE001
-            log.error("Housekeeping loop error: %s", e)
+        except Exception:
+            log.exception("Housekeeping loop error")

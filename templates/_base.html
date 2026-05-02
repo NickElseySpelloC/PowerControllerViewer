@@ -31,6 +31,27 @@
   updateClock();
   setInterval(updateClock, 1000);
 
+  // ── Format current browser time as "D Mon HH:MM:SS" ────────────────────────
+  function nowStr() {
+    var now = new Date();
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var d = now.getDate();
+    var mon = months[now.getMonth()];
+    var h = String(now.getHours()).padStart(2, '0');
+    var m = String(now.getMinutes()).padStart(2, '0');
+    var s = String(now.getSeconds()).padStart(2, '0');
+    return d + ' ' + mon + ' ' + h + ':' + m + ':' + s;
+  }
+
+  // ── Update footer "Last update" with current browser time ──────────────────
+  function updateFooterNow() {
+    var lc = document.getElementById('last-check');
+    if (lc) lc.textContent = nowStr();
+  }
+
+  // ── Device this page is showing (empty on the home page) ────────────────────
+  var PAGE_DEVICE = "{{ page_data.DeviceName | default('') | e }}";
+
   // ── WebSocket client ────────────────────────────────────────────────────────
   (function () {
     var WS_KEY = "{{ page_data.AccessKey or '' }}";
@@ -67,8 +88,13 @@
     connect();
   })();
 
-  // ── Page-specific WS handler (override in child templates) ──────────────────
+  // ── WS handler — child templates override this block ────────────────────────
   function handleWsMessage(msg) {
+    // If the device we're viewing was deleted, go home
+    if (msg.type === 'device_deleted' && PAGE_DEVICE && msg.device_name === PAGE_DEVICE) {
+      window.location.href = '{{ page_data.home_url }}';
+      return;
+    }
     {% block ws_handler %}{% endblock %}
   }
 </script>

@@ -49,8 +49,9 @@ ws_manager = ConnectionManager()
 
 # ── Lifespan (startup / shutdown) ────────────────────────────────────────────
 
+
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     logger.log_message("PowerControllerViewer starting up", "summary")
     await state_store.load_from_disk()
     hk_task = asyncio.create_task(housekeeping_loop(config, logger, state_store))

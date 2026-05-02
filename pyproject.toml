@@ -24,6 +24,14 @@ dependencies = [
 [tool.uv.sources]
 org-enums = { git = "https://github.com/NickElseySpelloC/org_enums", rev = "main" }
 
+[tool.ruff.lint]
+ignore = [
+    "DOC201",  # return type not documented in docstring — too noisy for internal helpers
+    "DOC501",  # raised exception not in docstring
+    "PLR0914", # too many local variables — view model builders are intentionally wide
+    "PLR0915", # too many statements — register_routes is intentionally monolithic
+]
+
 [dev.env.sync]
 remote="~/Library/CloudStorage/Dropbox/Development/dev_setup/app_config/PowerControllerViewer"
 patterns = [

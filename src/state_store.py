@@ -4,7 +4,6 @@ import datetime as dt
 import json
 import time
 from pathlib import Path
-from typing import Any
 from urllib.parse import quote
 
 from sc_foundation import DateHelper, JSONEncoder, SCCommon
@@ -168,25 +167,53 @@ class StateStore:
                     self._logger.log_message(f"Error deleting {file_path}: {e}", "error")
 
     async def check_external_changes(self):
-        """Pick up state files that were modified outside the app (e.g. manual drops)."""
+        """Pick up state files added/modified/deleted outside the app."""
         if not self.state_data_dir.exists():
             return
+
+        device_names_on_disk: set[str] = set()
+
         for file_path in self.state_data_dir.iterdir():
             if not file_path.is_file() or not file_path.name.endswith(".json") or file_path.name.startswith("."):
                 continue
-            device_name = file_path.stem
             mtime = file_path.stat().st_mtime
-            existing = self._states.get(device_name)
-            if existing is None or mtime > existing.get("_file_mtime", 0):
-                try:
-                    state = self._read_and_process(file_path)
-                    if state:
-                        state["_file_mtime"] = mtime
-                        self._states[device_name] = state
-                        await self._notify(device_name)
-                        self._logger.log_message(f"Reloaded externally changed: {file_path.name}", "debug")
-                except Exception as e:  # noqa: BLE001
-                    self._logger.log_message(f"Error reloading {file_path}: {e}", "error")
+
+            # Fast-path: if stem matches a known device and mtime is unchanged, skip.
+            # Use the stored DeviceName (canonical) for the on-disk set, not the stem,
+            # so the deletion check below stays consistent.
+            stem = file_path.stem
+            existing_by_stem = self._states.get(stem)
+            if existing_by_stem is not None and mtime <= existing_by_stem.get("_file_mtime", 0):
+                device_names_on_disk.add(existing_by_stem.get("DeviceName") or stem)
+                continue
+
+            # Read file to get canonical DeviceName from JSON
+            try:
+                state = self._read_and_process(file_path)
+                if not state:
+                    continue
+                device_name = state["DeviceName"]
+                device_names_on_disk.add(device_name)
+
+                existing = self._states.get(device_name)
+                if existing is not None and mtime <= existing.get("_file_mtime", 0):
+                    continue  # Already up to date under the canonical key
+
+                state["_file_mtime"] = mtime
+                self._states[device_name] = state
+                await self._notify(device_name)
+                self._logger.log_message(f"Reloaded externally changed: {file_path.name}", "debug")
+            except Exception as e:  # noqa: BLE001
+                self._logger.log_message(f"Error reloading {file_path}: {e}", "error")
+
+        # Detect deleted files (keyed by canonical DeviceName)
+        for device_name in list(self._states):
+            if device_name not in device_names_on_disk:
+                file_path = self.state_data_dir / f"{device_name}.json"
+                if not file_path.exists():
+                    del self._states[device_name]
+                    await self._notify(f"__deleted__:{device_name}")
+                    self._logger.log_message(f"Removed deleted state file for: {device_name}", "debug")
 
     # ── Subscriber notification ───────────────────────────────────────────────
 

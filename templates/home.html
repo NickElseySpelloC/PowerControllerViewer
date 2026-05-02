@@ -44,11 +44,19 @@
 {% endblock %}
 
 {% block ws_handler %}
+    if (msg.type === 'device_deleted') {
+      // Remove the deleted device's row; reload if none left
+      var delRow = document.querySelector('tr[data-device-name="' + msg.device_name + '"]');
+      if (delRow) delRow.remove();
+      if (!document.querySelector('tbody tr[data-device-name]')) window.location.reload();
+      return;
+    }
     if (msg.type === 'initial' || msg.type === 'state_update') {
       var devices = msg.type === 'initial' ? msg.devices : [msg.home_device];
+      var needsReload = false;
       devices.forEach(function (d) {
         var row = document.querySelector('tr[data-device-name="' + d.device_name + '"]');
-        if (!row) return;
+        if (!row) { needsReload = true; return; }
         var chk = row.querySelector('[data-field="last-check"]');
         if (chk) chk.textContent = d.last_check;
         var ind = row.querySelector('[data-field="indicator"]');
@@ -56,5 +64,8 @@
         var st = row.querySelector('[data-field="status"]');
         if (st) st.textContent = d.status;
       });
+      if (needsReload) { window.location.reload(); return; }
+      // Update footer timestamp with current browser time
+      if (devices.length) updateFooterNow();
     }
 {% endblock %}

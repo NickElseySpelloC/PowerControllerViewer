@@ -8,12 +8,14 @@ from view_models.common import format_date_with_ordinal, hours_to_string, nav_ur
 
 def build_home_view(all_states: list[dict], key: str | None, refresh_delay: int) -> dict:
     devices = [_build_device_row(s, key) for s in all_states]
+    last_update = format_date_with_ordinal(_latest_save(all_states), show_time=True)
     return {
         "home_url": nav_url("/", key),
         "AccessKey": key,
         "RefreshDelay": refresh_delay,
         "TimeNow": DateHelper.now_str(),
-        "LastStateUpdate": format_date_with_ordinal(_latest_save(all_states), show_time=True),
+        "LastStateUpdate": last_update,
+        "LastCheck": last_update,   # used by _base.html footer
         "Devices": devices,
     }
 

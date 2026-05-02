@@ -8,7 +8,7 @@ from view_models.common import format_date_with_ordinal, nav_url
 
 def build_temp_probes_view(
     state: dict,
-    state_idx: int,
+    _state_idx: int,
     next_idx: int | None,
     all_states: list[dict],
     key: str | None,
