@@ -3,50 +3,63 @@ The simple Python web app is used to display current status and recent history f
 
 https://github.com/NickElseySpelloC/
 
-# Basic Installation and Configuration
-1. Ensure that the basic prerequities are installed:
+# Basic Installation
 
-* Python 3.x installed:
-macOS: `brew install python3`
-Windows: `inget install python3 --source winget --scope machine`
-* UV for Python installed:
-macOS: `brew install uvicorn`
-Windows: `pip install uv`
+## Prerequities
 
-The shell script used to run the web app (*launch.sh*) is uses the *uv sync* command to ensure that all the prerequitie Python packages are installed in the virtual environment.
+Ensure that the basic prerequities are installed:
 
-2. Copy the PowerControllerViewer folder and including sub-directories to a new folder, for example */home/pi/scripts/PowerControllerViewer*
-3. Rename the _config.yaml.example_ file to _config.yaml_ file and at review the following settings:
+1. Python 3.13 installed:
+2. UV for Python installed:
+
+## Installing the app 
+
+For this documentation, we'll assume your current user is `pi` and you're installing the app at _/home/pi/scripts/PowerControllerViewer/_
+
+Clone the app from the github repo
+
+```bash
+cd /home/pi/scripts/
+git clone https://github.com/NickElseySpelloC/PowerControllerViewer.git
+```
+
+Now create and edit the config file:
+
+```bash
+cd /home/pi/scripts/PowerControllerViewer
+cp config.yaml.example config.yaml
+
+nano config.yaml
+```
+
+Edit the file as per the guide below and then save.
 
 ## Configuration File 
 
+The app expects to find the file config.yaml int he project root folder. The following keys and sections are supported.
+
 ```yaml
 Website:
-  HostingIP: 127.0.0.1
+  HostingIP: 0.0.0.0
   Port: 8000
-  PageAutoRefresh: 15
-  DebugMode: True
+  PageAutoRefresh: 30
   AccessKey: 
 
 Files:
   LogfileName: logfile.log
-  # Include the process ID in the log entries
   LogProcessID: True
   LogfileMaxLines: 5000
-  # How much information do we write to the log file. One of: none; error; warning; summary; detailed; debug; all
   LogfileVerbosity: detailed
-  # How much information do we write to the console. One of: error; warning; summary; detailed; debug; all
   ConsoleVerbosity: summary
 ```
 ### Config Section: Website
 
 | Parameter | Description | 
 |:--|:--|
-| HostingIP: | The IP address that the web server is listening on. Set to 127.0.0.1 by default. Use this if you will be setting up a production environment. | 
+| HostingIP: | The IP address that the web server is listening on. Set to 0.0.0.0 to listen on all network interfaces on the host. If setting up a production environment (see below), set to 127.0.0.1. | 
 | Port: | The port to listen on, defaults to 8000.| 
-| PageAutoRefresh: | Delay in seconds before the summary pages automatically refresh. Defaults to 10 seconds. Set to blank or 0 to disable refresh. | 
-| DebugMode: | False by default. If True, an exceptions will be reported via the web brower. Set to True for testing, False for a production deployment. | 
-| AccessKey: | An optional alphanumeric key that is used to protect access to the web site. If specified, the key must be included in the website URL, for example: http://127.0.0.1:8000/home?key=abcdef123456. If you specify a key, the same key must also be set for the _WebsiteAccessKey_ parameter in the sending application's configuration file.  | 
+| PageAutoRefresh: | Delay in seconds before any web page does a full automatically browser refresh (to update non-data elements). Defaults to 10 seconds. Set to blank or 0 to disable refresh. | 
+| AccessKey: | An optional alphanumeric key that is used to protect access to the web site. If specified, the key must be included in the website URL, for example: http://127.0.0.1:8000/home?key=abcdef123456. Alternatively, you can set the VIEWER_ACCESS_KEY environment variable in the .env file. <br><br>If you specify a key, the same key must also be set for the _WebsiteAccessKey_ parameter in the sending application's configuration file.  | 
 
 #### Config Section: Files
 
@@ -57,53 +70,13 @@ Files:
 | LogfileMaxLines| Maximum number of lines to keep in the MonitoringLogFileMaxLines. If zero, file will never be truncated. | 
 | LogfileVerbosity | The level of detail captured in the log file. One of: none; error; warning; summary; detailed; debug; all | 
 | ConsoleVerbosity | Controls the amount of information written to the console. One of: error; warning; summary; detailed; debug; all. Errors are written to stderr all other messages are written to stdout | 
+| DeleteOldStateFiles |  Delete state data files older than this many hours. Set to 0 or blank to disable deletion. | 
 
-## Project dependencies on a RaspberryPi
 
-This project now depends on the Pillow library. On a Pi, there’s no wheel available for pillow==12.0.0 for your combo (Python 3.13 + aarch64), so uv tries to compile Pillow from source, and that needs system libraries like libjpeg-dev, zlib1g-dev, etc. These aren't installed on a Pi by default, so use these steps to install the underlying image libs"
-
-1. Install build tools and image libraries
-
-```bash
-sudo apt-get update
-```
-
-2. Get the build tools (if you don't already have them)
-
-```bash
-sudo apt-get install -y build-essential python3-dev pkg-config
-```
-
-3. Get the libraries Pillow needs (jpeg + common image deps)
-The absolutely critical one for your error is libjpeg-dev, but the others help Pillow support more formats and avoid other build-time surprises.
-
-```bash
-sudo apt-get install -y \
-  libjpeg-dev \
-  zlib1g-dev \
-  libopenjp2-7-dev \
-  libtiff5-dev \
-  libfreetype6-dev \
-  libwebp-dev \
-  liblcms2-dev \
-  libimagequant-dev \
-  libxcb1-dev \
-  libpng-dev
-```
-
-4. Clear uv’s build cache
-Not strictly necessary, but if it keeps reusing a bad build:
-```bash
-uv cache clean
-```
-
-5. Add matplotlib again to force the compile of pillow
-```bash
-uv add matplotlib
-```
 # Running the web app
+
 For the remaining steps below, we assume that:
-* Your RaspberryPi is using IP _192.168.1.20_
+* Your host is using IP _192.168.1.20_
 * You have configured your web app to bind to port _8000_
 * You haven't setup an AccessKey
 
@@ -113,70 +86,20 @@ Use the shell script to run the web app. This uses UV to create the virtual envi
 Go to http://192.168.1.20:8000/home to view the web page. You should see something like this:
 ![No State Data Available](images/no_state_data.png)
 
-Now go edit the _config.yaml_ config file for the PowerController or LightingControl app. In the section for the viewer website, enter the details of this web app:
+Now go edit the _config.yaml_ config file for the PowerController or LightingControl app instance. In the section for the viewer website, enter the details of this web app:
 ```
   WebsiteBaseURL: http://192.168.1.20:8000
   WebsiteAccessKey: <Optional access key>
 ```
 
 Now go back to your web brower and refresh the web app page. You should see something like this
-![Summary page](images/summary_page.png)
-
-Run the PowerController app (or wait until it auto-runs from crontab). When it runs, it should post the latest state data to this web site. 
-
-# Running automatically from SystemDaemon
-Follow these steps to run a single thread of the web app in a non-production instance. Skip this and go to **Setup a Production Environment** if deploying to production.
-
-This uses the /home/pi/scripts/PowerControllerViewer/launch.sh script to launch the web app.
-
-## 1. Create a systemd service file
-Create a new system service file:
-```bash
-sudo nano /etc/systemd/system/PowerControllerViewer.service
-```
-
-Paste the following into the editor:
-```
-[Unit]
-Description=PowerController Web Interface
-After=network.target
-
-[Service]
-ExecStart=/home/pi/scripts/PowerControllerViewer/launch.sh 
-WorkingDirectory=/home/pi/scripts/PowerControllerViewer
-StandardOutput=inherit
-StandardError=inherit
-Restart=always
-RestartSec=10
-User=pi
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Note: Restart=always ensures the service is restarted automatically if it crashes. RestartSec=10 creates a 10 second delay before the restart.
-
-## 2. Enable the service to run at boot
-```bash
-sudo systemctl enable PowerControllerViewer.service
-```
-
-Now start the service:
-```bash
-sudo systemctl start PowerControllerViewer.service
-```
-
-Check the service status or logs:
-```bash
-sudo systemctl status PowerControllerViewer.service
-journalctl -u PowerControllerViewer.service -b
-```
+![Summary page](images/home_page.png)
 
 # Setup a production Environment
-This section shows you how to do a production deployment of the PowerControllerViewer web app on a RaspberryPi. This assumes:
+This section shows you how to do a production deployment of the PowerControllerViewer web app on a Linux host (inc. a  RaspberryPi). This assumes:
 
-1. The web UI files have been deployed to _/home/pi/scripts/PowerControllerViewer_. You may need to modify these steps for other enviroments (macOS, Windows, etc.). 
-2. Your RaspberryPi IP address is 192.168.1.20 - change as required in the examples below. 
+1. The app has been deployed to _/home/pi/scripts/PowerControllerViewer_ and tested as per the instructions above.
+2. Your host's IP address is 192.168.1.20 and the app is listening on port 8000 (change if required in the examples below). 
 
 ## 1. Install Prerequisites
 ```bash
@@ -184,19 +107,12 @@ sudo apt update
 sudo apt install python3-pip python3-venv nginx
 ```
 
-## 2. Activate the virtual environment and test Gunicorn manually
-```bash
-cd /home/pi/scripts/PowerControllerViewer
-source .venv/bin/activate
-.venv/bin/gunicorn --bind 192.168.1.20:8000 --pythonpath src wsgi:app
-```
+## 2. Configure the app to accept local connections only
 
-Visit http://192.168.1.20:8000/home to confirm it works. If you get an Access Denied message, add the Access Key that you specified in the config file, for example:
-http://192.168.1.20:8000/home?key=abcdef123456 
+Edit the config.yaml file and set the _HostingIP_ key to 127.0.0.1. This forces the web app to only accept connections from the nginx running locally on the same host (we'll setup nginx in a moment).
 
-Note: Use deactivate to exit from the virtual environment
 
-## 3. Create a systemd service for Gunicorn
+## 3. Create a systemd service for the app
 ```bash
 sudo nano /etc/systemd/system/PowerControllerViewer.service
 ```
@@ -204,15 +120,25 @@ sudo nano /etc/systemd/system/PowerControllerViewer.service
 And paste the following into the editor:
 ```
 [Unit]
-Description=Gunicorn instance to serve the PowerControllerViewer app
+Description=PowerControllerViewer web app
 After=network.target
 
 [Service]
-User=pi
-Group=www-data
+ExecStart=/home/pi/scripts/PowerControllerViewer/launch.sh 
 WorkingDirectory=/home/pi/scripts/PowerControllerViewer
-Environment="PATH=/home/pi/scripts/PowerControllerViewer/.venv/bin"
-ExecStart=/home/pi/scripts/PowerControllerViewer/.venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 --pythonpath src wsgi:app
+StandardOutput=journal
+StandardError=journal
+User=pi
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/home/nick/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Logging and restart behavior
+Restart=on-failure        # Only restart on non-zero exit code
+RestartSec=10             # Wait 10 seconds before restarting
+
+# Limit restart attempts (3 times in 60 seconds)
+StartLimitIntervalSec=60
+StartLimitBurst=3
 
 [Install]
 WantedBy=multi-user.target
@@ -232,14 +158,21 @@ journalctl -u PowerControllerViewer.service -b
 ```
 
 ## 4. Configure NGINX as a reverse proxy
+
+In this setup we setup a nginx reverse proxy server on your Linux host to listen on port 8088 and direct traffic to the PowerControllerViewer app on port 8000. 
+
+> This step assumes that nothing else is using port 8088 on your host. Do `sudo netstat -tulnp | grep :8088` to test.
+>
+> We have avoided using port 80 as it may be used by some otehr app (PiHole, Apache, etc.).
+
 ```bash
 sudo nano /etc/nginx/sites-available/PowerControllerViewer
 ```
 
-And paste the following into the editor (replace 192.168.1.20 with the IP of your RaspberryPi):
-```nginx
+And paste the following into the editor (replace 192.168.1.20 with the IP of your host):
+```
 server {
-    listen 80;
+    listen 8088;
     server_name 192.168.1.20;
 
     location / {
@@ -252,13 +185,9 @@ server {
 }
 ```
 
-Note: this assumes that nothing else is using port 80 on your RaspberryPi. If you already another app bound to that port (PiHole, Apache, etc.) then change the listen port in the config file above and remove the default nginx config so that it doesn't attempt to bind to port 80 at startup:
+Enable the proxy
 ```bash
 sudo rm /etc/nginx/sites-enabled/default
-```
-
-Enable the site:
-```bash
 sudo ln -s /etc/nginx/sites-available/PowerControllerViewer /etc/nginx/sites-enabled
 ```
 
@@ -277,23 +206,39 @@ Check the status:
 ```bash
 systemctl status nginx.service
 ```
+At this point the PowerControllerViewer app should be running and accessible on port 80 to remote clients on your local network: http://192.168.1.20:8088
+
+You could map an external port on your internet router (say port 80) to the host's IP and port 8088 so that you can access the app from the internet, but we recommend that before do that, you setup SSL and a domain name.
+
+# Setup support for https (SSL) and a domain name
+
+In this section we will enhance the production environment, installing an SSL certificate on nginx so that we can access the web app using https://.... The example below, the end state will be:
+
+* Web app accessible from the internet at https://power.abc.com
+* Public port 443 (https) is mapped to a nginx reverse proxy on the internal host, listing on port 4430. nginx:4430 routes the https traffic to the web app listing onthe same host as 127.0.0.1:8000
+* Public port 80 (http) is mapped to the same nginx reverse proxy on the internal host, listing on port 8088. nginx:8088 routes just certbot requests to certbot for SSL auto-renewals. Everything else is redirected to https
+
+## Determine your public IP address
+
+1. Determine the public IP of the network hosting your server, using https://whatismyipaddress.com/. 
+2. Ideally you should have a static IP assigned to your WAN interface (contact your ISP) or failing that have setup a Dynamic DNS service.
+
+## Confirm inbound ports unblocked
+
+Map port 80 on your WAN interface to port 8088 internally to the internal host (192.168.1.20 in our example).
+Map port 443 on your WAN interface to port 4430 internally to the same internal host.
+
+Confirm that your ISP is not blocking inbound port 80 on your public IP. Aussie Broadband blocks by default. It might be necessary to request a static IP from your ISP to get inbound ports unblocked. 
+
+## Register a domain name or sub-domain name
+
+We want to be able to access the app via a a domain name (e.g. https://abc.com) or sub-domain name (e.g. https://power.abc.com). 
+
+Register a new domain or select a subdomain name to use on an existing domain that you own. Configure the domain's DNS records with your public IP address. For the documentation below, we will assume you are using the subdomain mypower.somedomainname.com which has an A record IP address matching your WAN public IP.
 
 
-## 5. Setup an SSL certificate
-Optionally, install an SSL certificate on nginx so that we can access the web app using https://
+## Use certbot to get your SSL certificate
 
-### Confirm inbound ports unblocked
-Confirm that your ISP is not blocking inbound ports 80 and 443 on your public IP. Aussie Broadband blocks by default. It might be necessary to request a static IP from your ISP to get inbound ports unblocked. 
-
-### Test that you can access via port 80
-Configure your router to route port 80 externally to port 8000 on your RaspberryPi. Confirm that you can access the web app from a web browser external to your network (e.g. on a mobile connection).
-
-### Setup a domain name or host name
-Register a domain name or add a DNS A record to an existing domain that you own for your public IP. The rest of this section assumes that you have a host name of _power.abc.com_ with a DNS A record pointing at your networks public IP.
-
-Go to http://power.abc.com and confirm that you can access the web app from a web browser external to your network.
-
-### Use certbot to get your SSL certificate
 Install certbot:
 ```bash
 sudo apt install certbot python3-certbot-nginx
@@ -304,7 +249,7 @@ Run certbot for your nginx reverse proxy:
 sudo certbot --nginx
 ```
 
-You need to have port 80 open to your reverse proxy for this to work. During the certbot process you will be prompted for your domain name, for example _power.abc.com_.
+You need to have port 80 open to your reverse proxy for this to work (see above). During the certbot process you will be prompted for your domain name, for example _power.abc.com_.
 
 At the end you will see something like this:
 ```bash
@@ -320,7 +265,7 @@ At the end you will see something like this:
 >    renew *all* of your certificates, run "certbot renew"
 ```
 
-### Add the SSL certificate keys to your nginx configuration file
+## Add the SSL certificate keys to your nginx configuration file
 Edit the file:
 ```bash
 sudo nano /etc/nginx/sites-available/PowerControllerViewer
@@ -329,21 +274,33 @@ sudo nano /etc/nginx/sites-available/PowerControllerViewer
 And change the file so that it now looks like this:
 
 ```
+# Listen for http traffic on port 8088, which is mapped from port 80 on the WAN interface
+# We only accept http traffic for certbot auto-renewals
 server {
-    listen 80;
+    listen 8088;
     server_name power.abc.com;
 
-    # Redirect all HTTP to HTTPS
-    return 301 https://$host$request_uri;
+    # Everything else redirects to HTTPS
+    location / {
+        # If external clients actually connect on 443, leave it as:
+        # return 301 https://$host$request_uri;
+
+        # If they connect on 4430 externally, include the port:
+        # return 301 https://$host:4430$request_uri;
+
+        return 301 https://$host$request_uri;
+    }
 }
 
+# Listen for https traffic on port 4430, which is mapped from port 443 on the WAN interface
+# This will route traffic to the PowerControllerViewer app if it have a valid certificate
 server {
-    listen 443 ssl;
-    server_name power.elseyworld.com;
+    listen 4430 ssl;
+    server_name power.abc.com;
+    ssl_certificate /etc/letsencrypt/live/power.abc.com/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/power.abc.com/privkey.pem; # managed by Certbot
 
-    ssl_certificate /etc/letsencrypt/live/power.abc.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/power.abc.com/privkey.pem;
-
+    # Send the https traffic to the web app listening locally on port 8000
     location / {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host $host;
@@ -351,20 +308,17 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
 }
 ```
 
 Save the file and test the configuration:
 ```bash
 sudo nginx -t
-```
-
-Reload the configuration:
-```bash
 sudo systemctl reload nginx
 ```
 
-### Manual renewal
+## Manual renewal
 If you're having problems with the certbot auto-renewing your SSL certificate:
 
 First, make sure the directory exists:
@@ -394,7 +348,7 @@ test
 If that works, request/renew with:
 
 ```bash
-sudo certbot certonly --webroot -w /var/www/certbot -d power.elseyworld.com
+sudo certbot certonly --webroot -w /var/www/certbot -d power.abc.com
 ```
 Then test renewal:
 
@@ -402,5 +356,6 @@ Then test renewal:
 sudo certbot renew --dry-run
 ```
 
-### Test the HTTPS connection
-Open up port forwarding on your route for port 443 externally to port 443 internally. Now got to https://power.abc.com from an external web browser and make sure it works. 
+## Test the HTTPS connection
+
+Go to https://power.abc.com from an external web browser and make sure it works. 

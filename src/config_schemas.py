@@ -10,7 +10,6 @@ class ConfigSchema:
                 "HostingIP": None,
                 "Port": "8000",
                 "PageAutoRefresh": 10,
-                "DebugMode": False,
                 "AccessKey": None,
             },
             "Files": {

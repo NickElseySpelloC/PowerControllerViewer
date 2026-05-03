@@ -2,6 +2,7 @@
 import asyncio
 import contextlib
 import logging
+import os
 import traceback
 
 from fastapi import Request, WebSocket, WebSocketDisconnect
@@ -32,7 +33,8 @@ def register_routes(app, templates: Jinja2Templates, config, logger, state_store
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _key() -> str | None:
-        return config.get("Website", "AccessKey")
+        access_key = os.environ.get("VIEWER_ACCESS_KEY")
+        return access_key or config.get("Website", "AccessKey")
 
     def _refresh() -> int:
         return int(config.get("Website", "PageAutoRefresh") or 0)

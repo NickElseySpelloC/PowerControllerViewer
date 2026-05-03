@@ -5,7 +5,6 @@ Website:
   HostingIP: 127.0.0.1
   Port: 8000
   PageAutoRefresh: 15
-  DebugMode: True
   AccessKey: 
 
 Files:
