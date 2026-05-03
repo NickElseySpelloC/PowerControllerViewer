@@ -130,7 +130,7 @@ StandardOutput=journal
 StandardError=journal
 User=pi
 Environment=PYTHONUNBUFFERED=1
-Environment=PATH=/home/nick/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=PATH=/home/pi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Logging and restart behavior
 Restart=on-failure        # Only restart on non-zero exit code
